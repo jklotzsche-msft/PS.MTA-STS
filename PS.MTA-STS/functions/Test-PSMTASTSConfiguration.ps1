@@ -11,21 +11,33 @@
         - ...policy file is available and
         - ...MX record is configured correctly.
 
+        .PARAMETER DisplayResult
+        Provide a Boolean value, if the result should be displayed in the console. Default is $true.
+
         .PARAMETER CsvPath
         Provide path to csv file with accepted domains.
         Csv file should have one column with header "DomainName" and list of domains in each row.
 
         .PARAMETER FunctionAppName
-        Provide name of Function App.    
+        Provide name of Function App.
 
         .PARAMETER DnsServer
-        Provide IP address of DNS server to use for DNS queries. Default is 8.8.8.8 (Google DNS).    
+        Provide IP address of DNS server to use for DNS queries. Default is 8.8.8.8 (Google DNS).
 
         .PARAMETER ExportResult
         Switch Parameter. Export result to CSV file.
         
         .PARAMETER ResultPath
         Provide path to CSV file where result should be exported. Default is "C:\temp\mta-sts-result.csv".
+
+        .PARAMETER ExoHost
+        Provide a String containing the host name of the MX record, which should be used to check, if the MX record points to Exchange Online. Default is *.mail.protection.outlook.com.
+
+        .PARAMETER WhatIf
+        Switch to run the command in a WhatIf mode.
+
+        .PARAMETER Confirm
+        Switch to run the command in a Confirm mode.
 
         .EXAMPLE
         Test-PSMTASTSConfiguration -CsvPath "C:\temp\accepted-domains.csv" -FunctionAppName "MTA-STS-FunctionApp"
@@ -47,10 +59,12 @@
         [String]
         $FunctionAppName,
 
-        [Parameter()]
         [String]
         $DnsServer = "8.8.8.8",
-    
+
+        [Bool]
+        $DisplayResult = $true,
+
         [Parameter(ParameterSetName = "ExportResult")]
         [Switch]
         $ExportResult,
@@ -63,10 +77,6 @@
         [String]
         $ExoHost = "*.mail.protection.outlook.com"
     )
-    
-    begin {
-        
-    }
     
     process {
         # Prepare variables
@@ -102,10 +112,10 @@ max_age: 604800
             # Check MTA-STS TXT record
             Write-Verbose "...Checking MTA-STS TXT record for $mtaStsName."
             $txtRecord = Resolve-DnsName -Name "_$mtaStsName" -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue
-            if (($null -ne $txtRecord) -and ($txtRecord.strings -like $txtRecordContent)) {
+            if ($txtRecord -and ($txtRecord.strings -like $txtRecordContent)) {
                 $resultObject.MTA_STS_TXT = "OK"
             }
-            elseif (($null -ne $txtRecord) -and ($txtRecord.strings -notlike $txtRecordContent)) {
+            elseif ($txtRecord -and ($txtRecord.strings -notlike $txtRecordContent)) {
                 $resultObject.MTA_STS_TXT = "TXT record does not contain the expected content. The following content was found: $($txtRecord.strings -join ", ")"
                 $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
             }
@@ -117,10 +127,10 @@ max_age: 604800
             # Check MTA-STS CNAME record
             Write-Verbose "...Checking MTA-STS CNAME record for $mtaStsName."
             $cnameRecord = Resolve-DnsName -Name $mtaStsName -Type CNAME -Server $DnsServer -ErrorAction SilentlyContinue
-            if (($null -ne $cnameRecord) -and ($resultObject.Host -eq $cnameRecord.NameHost)) {
+            if ($cnameRecord -and ($resultObject.Host -eq $cnameRecord.NameHost)) {
                 $resultObject.MTA_STS_CNAME = "OK"
             }
-            elseif (($null -ne $cnameRecord) -and ($resultObject.Host -ne $cnameRecord.NameHost)) {
+            elseif ($cnameRecord -and ($resultObject.Host -ne $cnameRecord.NameHost)) {
                 $resultObject.MTA_STS_CNAME = "CNAME record does not contain the expected content. The following content was found: $($cnameRecord.NameHost -join ", ")"
                 $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
             }
@@ -142,10 +152,10 @@ max_age: 604800
                 $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
             }
 
-            if (($null -ne $policyFile) -and ($policyFile.Content -eq $mtaStsPolicyFileContent)) {
+            if ($policyFile -and ($policyFile.Content -eq $mtaStsPolicyFileContent)) {
                 $resultObject.MTA_STS_PolicyFile = "OK"
             }
-            if (($null -ne $policyFile) -and ($policyFile.Content -ne $mtaStsPolicyFileContent)) {
+            if ($policyFile -and ($policyFile.Content -ne $mtaStsPolicyFileContent)) {
                 $resultObject.MTA_STS_PolicyFile = "Policy file does not contain the expected content. The following content was found: $($policyFile.Content)"
                 $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
             }
@@ -169,19 +179,15 @@ max_age: 604800
             $counter++
         }
 
-        # Show result in Out-GridView
-        Write-Warning "Please check the results in the new PowerShell window."
-        $result | Out-GridView -Title "Test MTA-STS Configuration"
+        # Output the result in a new PowerShell window
+        if($DisplayResult) {
+            Write-Warning "Please check the results in the new PowerShell window."
+            $result | Out-GridView -Title "Test MTA-STS Configuration"
+        }
 
         # Export result to CSV
         if ($ExportResult) {
             $result | Export-Csv -Path $ResultPath -Encoding UTF8 -Delimiter ";" -NoTypeInformation
         }
     }
-    
-    end {
-        
-    }
 }
-
-

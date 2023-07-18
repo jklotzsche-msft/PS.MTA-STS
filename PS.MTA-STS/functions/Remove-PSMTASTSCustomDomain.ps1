@@ -15,6 +15,12 @@
         .PARAMETER DomainName
         Provide name of domain to be removed.
 
+        .PARAMETER WhatIf
+        Switch to run the command in a WhatIf mode.
+
+        .PARAMETER Confirm
+        Switch to run the command in a Confirm mode.
+
         .EXAMPLE
         Remove-PSMTASTSCustomDomain -ResourceGroupName "MTA-STS" -FunctionAppName "MTA-STS-FunctionApp" -DomainName "mta-sts.contoso.com"
 
@@ -39,7 +45,7 @@
     )
     
     begin {
-        if (($ResourceGroupName -and $FunctionAppName) -and ($null -eq (Get-AzContext))) {
+        if (-not (Get-AzContext)) {
             Write-Warning "Connecting to Azure service..."
             $null = Connect-AzAccount -ErrorAction Stop
         }
@@ -47,18 +53,18 @@
     
     process {
         # Create new domain
-        if($domain -notlike "mta-sts-*") {
-            $domain = "mta-sts.$domain"
+        if ($DomainName -notlike "mta-sts-*") {
+            $DomainName = "mta-sts.$DomainName"
         }
 
         # Get current domains
         $currentHostnames = Get-PSMTASTSCustomDomain -ResourceGroupName $ResourceGroupName -FunctionAppName $FunctionAppName
 
         # Remove domain from array
-        $newHostNames = $currentHostnames | Where-Object {$_ -ne $domain}
+        $newHostNames = $currentHostnames | Where-Object { $_ -ne $DomainName }
         
         # Try to remove domain from Function App
-        if($null -ne (Compare-Object -ReferenceObject $currentHostnames -DifferenceObject $newHostNames)) {
+        if (Compare-Object -ReferenceObject $currentHostnames -DifferenceObject $newHostNames) {
             Write-Verbose "Removing $($currentHostnames.count - $newHostNames.count) domains from Function App $FunctionAppName..."
             try {
                 $null = Set-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -HostNames $newHostNames -ErrorAction Stop
@@ -68,9 +74,4 @@
             }
         }
     }
-    
-    end {
-        
-    }
-
 }

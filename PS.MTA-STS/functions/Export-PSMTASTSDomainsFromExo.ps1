@@ -6,6 +6,9 @@
         .DESCRIPTION
         This script exports all domains from Exchange Online and checks, if the MX record points to Exchange Online. The result is exported to a .csv file.
 
+        .PARAMETER DisplayResult
+        Provide a Boolean value, if the result should be displayed in the console. Default is $true.
+
         .PARAMETER CsvOutputPath
         Provide a String containing the path to the .csv file, where the result should be exported to.
 
@@ -21,8 +24,13 @@
         .EXAMPLE
         Export-PSMTASTSDomainsFromExo.ps1 -CsvOutputPath "C:\Temp\MTASTSDomains.csv"
 
+        Gets accepted domains from Exchange Online and checks, if the MX record points to Exchange Online. The result is exported to "C:\Temp\MTASTSDomains.csv".
+
         .EXAMPLE
-        Get-AcceptedDomain -ResultSize unlimited | Export-PSMTASTSDomainsFromExo.ps1 -CsvOutputPath "C:\Temp\MTASTSDomains.csv"
+        Get-AcceptedDomain -ResultSize 10 | Export-PSMTASTSDomainsFromExo.ps1 -CsvOutputPath "C:\Temp\MTASTSDomains.csv"
+
+        Gets 10 accepted domains from Exchange Online and checks, if the MX record points to Exchange Online. The result is exported to "C:\Temp\MTASTSDomains.csv".
+        If you want to filter the accepted domains first, you can do so and pipe it to the Export-PSMTASTSDomainsFromExo function.
 
         .LINK
         https://github.com/jklotzsche-msft/PS.MTA-STS
@@ -34,10 +42,12 @@
         $CsvOutputPath,
 
         [Parameter(ValueFromPipeline = $true)]
-        [PSCustomObject[]]
+        [PSObject[]]
         $MTASTSDomain,
 
-        [Parameter()]
+        [Bool]
+        $DisplayResult = $true,
+
         [String]
         $DnsServerToQuery = "8.8.8.8",
 
@@ -47,6 +57,11 @@
     )
     
     begin {
+        # Get all domains from Exchange Online
+        $result = @()
+    }
+    
+    process {
         # Connect to Exchange Online, if not already connected
         $exchangeConnection = Get-ConnectionInformation -ErrorAction SilentlyContinue | Sort-Object -Property TokenExpiryTimeUTC -Descending | Select-Object -First 1 -ExpandProperty State
         if (($exchangeConnection -ne "Connected") -and ($null -eq $MTASTSDomain)) {
@@ -54,11 +69,6 @@
             $null = Connect-ExchangeOnline -ShowBanner:$false -ErrorAction Stop
         }
 
-        # Get all domains from Exchange Online
-        $result = @()
-    }
-    
-    process {
         if($null -eq $MTASTSDomain) {
             Write-Verbose "Getting all domains from Exchange Online and checking MX-Record. Please wait..."
             $MTASTSDomain = Get-AcceptedDomain -ResultSize unlimited | Sort-Object -Property Name
@@ -80,24 +90,29 @@
                 $resultObject.MTA_STS_CanBeUsed = "Yes"
             }
             elseif (($mxRecord.NameExchange.count -gt 1) -or ($mxRecord.NameExchange -notlike $ExoHost)) {
-                $warningText = "WARNING: MX Record doesn not point to Exchange Online (only). The following host(s) was/were found: $($mxRecord.NameExchange -join ", ")"
-                $resultObject.MX_Record_Pointing_To = $warningText
+                $resultObject.MX_Record_Pointing_To = "WARNING: MX Record doesn not point to Exchange Online (only). The following host(s) was/were found: $($mxRecord.NameExchange -join ", ")"
                 $resultObject.MTA_STS_CanBeUsed = "No"
             }
             else {
-                $errorText = "ERROR: No MX record found. Please assure, that the MX record for $($mtastsd.DomainName) points to Exchange Online."
-                $resultObject.MX_Record_Pointing_To = $errorText
+                $resultObject.MX_Record_Pointing_To = "ERROR: No MX record found. Please assure, that the MX record for $($mtastsd.DomainName) points to Exchange Online."
                 $resultObject.MTA_STS_CanBeUsed = "No"
             }
         
             $result += $resultObject
-        } 
+        }
     }
     
     end {
-        # Output the result
-        Write-Warning "Please select/highlight the domains you want to use for MTA-STS in the new PowerShell window and click OK. You can select multiple entries by holding the CTRL key and clicking on the entries OR by holding the SHIFT key and clicking on the first and last entry."
-        $domainsToExport = $result | Out-GridView -Title "Please select the domains you want to use for MTA-STS and click OK." -PassThru
+        # Output the result in a new PowerShell window
+        if($DisplayResult) {
+            Write-Warning "Please select/highlight the domains you want to use for MTA-STS in the new PowerShell window and click OK. You can select multiple entries by holding the CTRL key and clicking on the entries OR by holding the SHIFT key and clicking on the first and last entry."
+            $domainsToExport = $result | Out-GridView -Title "Please select the domains you want to use for MTA-STS and click OK." -PassThru
+        }
+        else {
+            $domainsToExport = $result
+        }
+
+        # Export the result to a .csv file
         if ($domainsToExport) {
             Write-Verbose "Exporting $($domainsToExport.count) domain(s) to $CsvOutputPath..."
             $domainsToExport | Export-Csv -Path $CsvOutputPath -NoTypeInformation -Encoding UTF8 -Delimiter ";" -Force

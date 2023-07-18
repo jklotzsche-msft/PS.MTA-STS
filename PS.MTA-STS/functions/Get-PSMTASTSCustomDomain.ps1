@@ -32,7 +32,7 @@
     )
     
     begin {
-        if (($ResourceGroupName -and $FunctionAppName) -and ($null -eq (Get-AzContext))) {
+        if ( -not (Get-AzContext)) {
             Write-Warning "Connecting to Azure service..."
             $null = Connect-AzAccount -ErrorAction Stop
         }
@@ -42,9 +42,4 @@
         Write-Verbose "Getting domains of Function App $FunctionAppName..."
         Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName | Select-Object -ExpandProperty HostNames
     }
-    
-    end {
-        
-    }
-
 }
