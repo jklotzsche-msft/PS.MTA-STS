@@ -5,12 +5,20 @@ This guide will help you to deploy MTA-STS for your domain(s) using a Azure Func
 ## Prerequisites
 
 1. active Azure Subscription, to create the required Azure resources
-2. [PowerShell 7.0](https://learn.microsoft.com/en-us/shows/it-ops-talk/how-to-install-powershell-7) or later
-3. PowerShell modules
+2. PowerShell modules
     - [Az.Accounts](https://www.powershellgallery.com/packages/Az.Accounts)
+    - [Az.Functions](https://www.powershellgallery.com/packages/Az.Functions)
+    - [Az.Resources](https://www.powershellgallery.com/packages/Az.Resources)
+    - [Az.Storage](https://www.powershellgallery.com/packages/Az.Storage)
     - [Az.Websites](https://www.powershellgallery.com/packages/Az.Websites)
     - [ExchangeOnlineManagement](https://www.powershellgallery.com/packages/ExchangeOnlineManagement)
     - [PS.MTA-STS](https://www.powershellgallery.com/packages/PS.MTA-STS)
+
+You can install the required PowerShell modules and the PS.MTA-STS module using the following command:
+
+```PowerShell
+Install-Module -Name "Az.Accounts", "Az.Functions", "Az.Resources", "Az.Storage", "Az.Websites", "ExchangeOnlineManagement", "PS.MTA-STS"
+```
 
 ## Deployment
 
@@ -20,11 +28,10 @@ Before we start deploying Azure resources, we must prepare a list of domains we 
 
 To create the list, we will use the prepared PowerShell function [Export-PSMTASTSDomainsFromExo](../PS.MTA-STS/functions/Export-PSMTASTSDomainsFromExo.ps1) from the [PS.MTA-STS module](https://www.powershellgallery.com/packages/PS.MTA-STS/). This function will connect to Exchange Online and read all accepted domains. Then, it will check the MX record for each found domain to validate if it points to Exchange Online. Afterwards, you will be asked to select the domains you want to deploy MTA-STS for from a graphical interface. The selected domains will be exported to a CSV file.
 
-To run the function, open a PowerShell 7.0 or later console, install and import the module:
+To run the function, open a PowerShell console, install and import the module:
 
 ```PowerShell
 Install-Module -Name PS.MTA-STS
-Import-Module -Name PS.MTA-STS
 ```
 
 Then, run the function (edit the path to the CSV file as needed):
@@ -37,7 +44,45 @@ Alternatively, check out the comment-based help of the function using `Get-Help 
 
 ## Step 2: Create Azure Function App
 
+If you want to create the Azure resources automatically, continue with step 2.1. If you want to create the Azure resources manually, continue with step 2.2.
+
+In both cases, remember the valid characters for the Azure resources:
+
+- Resource Group Name
+  - Length: 1-90
+  - Valid characters: lowercase letters, numbers, periods, and hyphens (a-z, 0-9, ., and -)
+- Function App Name
+  - Length: 2-60
+  - Valid characters: lowercase letters, numbers and hyphens (a-z, 0-9, and -)
+- Storage Account Name:
+  - Length: 3-24
+  - Valid characters: lowercase letters and numbers (a-z and 0-9)
+
+### Step 2.1: Create Azure resources automatically
+
 Now that you prepared the list of domains you want to deploy MTA-STS for, we can start to create the required Azure resources.
+
+We will need a resource group and a Azure Function App. To create both resources automatically, use the function "Start-PSMTASTSFunctionAppDeployment" and provide your desired Azure Location, Resource Group Name and Function App Name:
+
+```PowerShell
+# Connect to Azure
+Connect-AzAccount
+
+# Create resource group and Azure Function App
+Start-PSMTASTSFunctionAppDeployment -Location "westeurope" -ResourceGroupName "rg-PSMTASTS" -FunctionAppName "func-PSMTASTS" -StorageAccountName "storagepsmtasts"
+```
+
+This will look like this:
+
+<img alt="Screenshot of creation of Azure Function App function" src="./_images/1_0_deploy_0.png" width="1000" />
+
+(You can safely ignore the warning about the "Upcoming breaking changes in the cmdlet 'New-AzStorageAccount'")
+
+If your deployment was successful, you can continue with step 3.
+
+### Step 2.2: Create Azure resources manually
+
+If you do not want to create the function app automatically, follow these steps:
 
 First of all, we must create a resource group which will combine all necessary resources. To do so, go to [Azure Portal](https://portal.azure.com/#home), search for "Resource groups", switch to the service page and select "Create".
 
@@ -66,8 +111,6 @@ Leave the default settings for Storage, Networking, Monitoring and Deployment.
 
 Select "Review + create" and then "Create".
 
-## Step 3: Configure your Azure Function App
-
 Next, we must replace some file contents of our newly created Azure Function App. To do so, go to [Azure Portal](https://portal.azure.com/#home), search for "Function App", switch to the service page and select the function app you created in the previous step.
 
 Select "App files" and replace the contents of "host.json", "profile.ps1" and "requirements.psd1" with the following contents:
@@ -83,7 +126,7 @@ Select "App files" and replace the contents of "host.json", "profile.ps1" and "r
     }
   },
   "managedDependency": {
-    "Enabled": true
+    "Enabled": false
   },
   "extensionBundle": {
     "id": "Microsoft.Azure.Functions.ExtensionBundle",
@@ -125,8 +168,7 @@ Select "App files" and replace the contents of "host.json", "profile.ps1" and "r
 # See https://aka.ms/functionsmanageddependency for additional information.
 #
 @{
-    # Basic tools for your function
-    'Azure.Function.Tools' = '1.*'
+
 }
 ```
 
@@ -208,9 +250,9 @@ catch {
 }
 ```
 
-That's it. Your Function App is now prepared to publish the MTA-STS policy. Custom Domains will be added in step 5.
+That's it. Your Function App is now prepared to publish the MTA-STS policy. Custom Domains will be added in step 4.
 
-## Step 4: Create CNAME records in public DNS for your domains
+## Step 3: Create CNAME and TXT records in public DNS for your domains
 
 Before adding your custom domains, you have to prepare CNAME records for the validation process. To do so, go to your public DNS provider and create the two following records per domain:
 
@@ -221,19 +263,19 @@ Before adding your custom domains, you have to prepare CNAME records for the val
 
 Your can find the \<your-functionapp-custom-domain-verification-ID> in the Azure Portal. Go to your Function App service page, select "Custom domains". You will find the ID in the "Custom domain verification ID" field on top of the page.
 
-## Step 5: Add custom domains to Azure Function App
+## Step 4: Add custom domains to Azure Function App
 
 Now that you have prepared the CNAME records, you can add your custom domains to the Azure Function App. To do so, you can use the [Add-PSMTASTSCustomDomain](../PS.MTA-STS/functions/Add-PSMTASTSCustomDomain.ps1) function. The function will validate the CNAME records and add the custom domain to the Azure Function App.
 
 Simply run the function and edit the parameters as required:
 
 ```PowerShell
-Add-PSMTASTSCustomDomain -CsvPath "C:\temp\acceptedDomains.csv" -ResourceGroupName "MTA-STS" -FunctionAppName "MTA-STS-FunctionApp"
+Add-PSMTASTSCustomDomain -CsvPath "C:\temp\acceptedDomains.csv" -ResourceGroupName "rg-PSMTASTS" -FunctionAppName "func-PSMTASTS"
 ```
 
 Alternatively, check out the comment-based help of the function using `Get-Help -Name Add-PSMTASTSCustomDomain -Full` for more information.
 
-## Step 6: Create TXT record in public DNS to enable MTA-STS
+## Step 5: Create TXT record in public DNS to enable MTA-STS
 
 Lastly, you have to create a TXT record in your public DNS to enable MTA-STS for your domain. To do so, go to your public DNS provider and create the following record per domain:
 
@@ -241,19 +283,19 @@ Lastly, you have to create a TXT record in your public DNS to enable MTA-STS for
 | ---- | ---- | ----- |
 | _mta-sts.\<your-custom-domain> | TXT | v=STSv1; id=\<your own unique id, e.g. the current date as 20230712120000>Z; |
 
-## Step 7: Verify MTA-STS policy
+## Step 6: Verify MTA-STS policy
 
-To verify that your MTA-STS policy is working, you can use the [Test-MTASTSConfiguration](../PS.MTA-STS/functions/Test-MTASTSConfiguration.ps1) function. The function will test the MTA-STS policy for your domain and return the result. If you want to export the result to a CSV file, you can use the -ExportResult parameter as shown in the second example below.
+To verify that your MTA-STS policy is working, you can use the [Test-PSMTASTSConfiguration](../PS.MTA-STS/functions/Test-PSMTASTSConfiguration.ps1) function. The function will test the MTA-STS policy for your domain and return the result. If you want to export the result to a CSV file, you can use the -ExportResult parameter as shown in the second example below.
 
 ```PowerShell
-    # Reads list of accepted domains from "C:\temp\accepted-domains.csv" and checks if MTA-STS is configured correctly for each domain in Function App "MTA-STS-FunctionApp".
+    # Reads list of accepted domains from "C:\temp\acceptedDomains.csv" and checks if MTA-STS is configured correctly for each domain in Function App "MTA-STS-FunctionApp".
 
-    Test-MTASTSConfiguration -CsvPath "C:\temp\accepted-domains.csv" -FunctionAppName "MTA-STS-FunctionApp"
+    Test-PSMTASTSConfiguration -CsvPath "C:\temp\acceptedDomains.csv" -FunctionAppName "func-PSMTASTS"
 
 
-    # Reads list of accepted domains from "C:\temp\accepted-domains.csv" and checks if MTA-STS is configured correctly for each domain in Function App "MTA-STS-FunctionApp". It also exports result to "C:\temp\mta-sts-result.csv".
+    # Reads list of accepted domains from "C:\temp\acceptedDomains.csv" and checks if MTA-STS is configured correctly for each domain in Function App "MTA-STS-FunctionApp". It also exports result to "C:\temp\mta-sts-result.csv".
 
-    Test-MTASTSConfiguration -CsvPath "C:\temp\accepted-domains.csv" -FunctionAppName "MTA-STS-FunctionApp" -ExportResult -ResultPath "C:\temp\mta-sts-result.csv"
+    Test-PSMTASTSConfiguration -CsvPath "C:\temp\acceptedDomains.csv" -FunctionAppName "func-PSMTASTS" -ExportResult -ResultPath "C:\temp\mta-sts-result.csv"
 
     
 ```

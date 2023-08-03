@@ -77,8 +77,13 @@
         [String]
         $ExoHost = "*.mail.protection.outlook.com"
     )
-    
+
     process {
+        trap {
+            Write-Error $_
+            return
+        }
+
         # Prepare variables
         $csv = Import-Csv -Path $CsvPath -Encoding UTF8 -Delimiter ";" -ErrorAction Stop
         $txtRecordContent = "v=STSv1; id=*Z;"

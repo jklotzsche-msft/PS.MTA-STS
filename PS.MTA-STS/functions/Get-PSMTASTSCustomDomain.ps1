@@ -39,6 +39,11 @@
     }
     
     process {
+        trap {
+            Write-Error $_
+            return
+        }
+        
         Write-Verbose "Getting domains of Function App $FunctionAppName..."
         Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName | Select-Object -ExpandProperty HostNames
     }

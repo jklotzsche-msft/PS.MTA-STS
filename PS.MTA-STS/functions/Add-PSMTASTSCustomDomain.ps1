@@ -56,6 +56,11 @@
     }
     
     process {
+        trap {
+            Write-Error $_
+            return
+        }
+        
         $newHostNames = @()
         $currentHostnames = Get-PSMTASTSCustomDomain -ResourceGroupName $ResourceGroupName -FunctionAppName $FunctionAppName
         $newHostNames += $currentHostnames

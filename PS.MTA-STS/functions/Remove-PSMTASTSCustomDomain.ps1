@@ -52,6 +52,11 @@
     }
     
     process {
+        trap {
+            Write-Error $_
+            return
+        }
+        
         # Create new domain
         if ($DomainName -notlike "mta-sts-*") {
             $DomainName = "mta-sts.$DomainName"

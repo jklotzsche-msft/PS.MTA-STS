@@ -62,6 +62,11 @@
     }
     
     process {
+        trap {
+            Write-Error $_
+            return
+        }
+        
         # Connect to Exchange Online, if not already connected
         $exchangeConnection = Get-ConnectionInformation -ErrorAction SilentlyContinue | Sort-Object -Property TokenExpiryTimeUTC -Descending | Select-Object -First 1 -ExpandProperty State
         if (($exchangeConnection -ne "Connected") -and ($null -eq $MTASTSDomain)) {
