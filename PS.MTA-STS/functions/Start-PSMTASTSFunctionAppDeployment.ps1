@@ -1,7 +1,7 @@
 ﻿function Start-PSMTASTSFunctionAppDeployment {
     <#
     .SYNOPSIS
-        Creates an Azure Function App with the needed PowerShell code to publish MTA-STS policies.        
+        Creates an Azure Function App with the needed PowerShell code to publish MTA-STS policies.
 
     .DESCRIPTION
         Creates an Azure Function App with the needed PowerShell code to publish MTA-STS policies.
@@ -16,15 +16,25 @@
     
     .PARAMETER ResourceGroupName
         Provide the name of the Azure resource group, where the Azure Function App should be created.
-        If the resource group doesn't exist, it will be created.        
+        If the resource group doesn't exist, it will be created.
     
     .PARAMETER FunctionAppName
         Provide the name of the Azure Function App, which should be created.
-        If the Azure Function App doesn't exist, it will be created.
+        If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
         If the Azure Function App exists, it will be updated with the latest PowerShell code.
         
+    .PARAMETER StorageAccountName
+        Provide the name of the Azure Storage Account, which should be created.
+        If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
+
+    .PARAMETER WhatIf
+        If this switch is provided, no changes will be made. Only a summary of the changes will be shown.
+
+    .PARAMETER Confirm
+        If this switch is provided, you will be asked for confirmation before any changes are made.
+
     .EXAMPLE
-        Start-PSMTASTSFunctionAppDeployment -Location 'West Europe' -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS'
+        Start-PSMTASTSFunctionAppDeployment -Location 'West Europe' -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS' -StorageAccountName 'stpsmtasts'
         
         Creates an Azure Function App with the name 'PSMTASTS' in the resource group 'PSMTASTS' in the location 'West Europe'.
         If the resource group doesn't exist, it will be created.
@@ -36,7 +46,7 @@
     #>
 
     #region Parameter
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess)]
     Param (
         [Parameter(Mandatory = $true)]
         [String]
@@ -82,6 +92,7 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
             $null = Connect-AzAccount -ErrorAction Stop
         }
     }
+    
     process {
         trap {
             Write-Error $_
@@ -92,15 +103,14 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
         Write-Verbose "Checking if location '$($Location)' is valid."
         $validLocations = Get-AzLocation | Select-Object -ExpandProperty location
         if(-not ($Location -in $validLocations)) {
-            Write-Host -Object "Location '$($Location)' is not valid. Please provide one of the following values: $($validLocations -join ', ')" -ForegroundColor Red
+            Write-Verbose "Location '$($Location)' is not valid. Please provide one of the following values: $($validLocations -join ', ')" -ForegroundColor Red
             return
         }
 
         # Create, if resource group doesn't exist already. If it doesn't exist, create it.
         if ($null -eq (Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue)) {
-            Write-Host -Object "Creating Azure Resource Group $($ResourceGroupName)..." -NoNewline
+            Write-Verbose "Creating Azure Resource Group $($ResourceGroupName)..."
             $null = New-AzResourceGroup -Name $ResourceGroupName -Location $Location
-            Write-Host -Object "OK" -ForegroundColor Green
         }
 
         # Set default resource group for future cmdlets in this powershell session
@@ -109,7 +119,7 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
         # Check, if FunctionApp exists already
         if($null -eq (Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -ErrorAction SilentlyContinue)) {
             # Create Storage Account
-            Write-Host -Object "Creating Azure Storage Account $StorageAccountName..." -NoNewline
+            Write-Verbose "Creating Azure Storage Account $StorageAccountName..."
             $newAzStorageAccountProps = @{
                 ResourceGroupName = $ResourceGroupName
                 Name = $StorageAccountName
@@ -119,10 +129,9 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
                 ErrorAction = 'Stop'
             }
             $null = New-AzStorageAccount @newAzStorageAccountProps
-            Write-Host -Object "OK" -ForegroundColor Green
 
             # Create Function App
-            Write-Host -Object "Creating Azure Function App $FunctionAppName..." -NoNewline
+            Write-Verbose "Creating Azure Function App $FunctionAppName..."
             $newAzFunctionAppProps = @{
                 ResourceGroupName = $ResourceGroupName
                 Name = $FunctionAppName
@@ -135,7 +144,6 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
                 ErrorAction = 'Stop'
             }
             $null = New-AzFunctionApp @newAzFunctionAppProps
-            Write-Host -Object "OK" -ForegroundColor Green
         }
 
         # Create Function App contents in temporary folder and zip it
@@ -154,15 +162,13 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
         $null = Compress-Archive -Path "$workingDirectory/function/*" -DestinationPath "$workingDirectory/Function.zip" -Force
 
         # Wait for Function App to be ready
-        Write-Host -Object "Waiting for Azure Function App $($FunctionAppName) to be ready..." -NoNewline
+        Write-Verbose "Waiting for Azure Function App $($FunctionAppName) to be ready..."
         $null = Start-Sleep -Seconds 60
-        Write-Host -Object "OK" -ForegroundColor Green
 
         # Upload PowerShell code to Azure Function App
-        Write-Host -Object "Uploading PowerShell code to Azure Function App $($FunctionAppName)..." -NoNewline
+        Write-Verbose "Uploading PowerShell code to Azure Function App $($FunctionAppName)..."
         $null = Publish-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -ArchivePath "$workingDirectory/Function.zip" -Confirm:$false -Force
-        Write-Host -Object "OK" -ForegroundColor Green
-
+        
         # Clean up
         $null = Remove-Item -Path $workingDirectory -Recurse -Force
     }
