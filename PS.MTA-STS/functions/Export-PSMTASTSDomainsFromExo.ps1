@@ -90,12 +90,16 @@
         
             Write-Verbose "Checking MX record for $($mtastsd.DomainName)..."
             $mxRecord = Resolve-DnsName -Name $mtastsd.DomainName -Type MX -Server $DnsServerToQuery -ErrorAction SilentlyContinue
-            if (($mxRecord.NameExchange.count -eq 1) -and ($mxRecord.NameExchange -like $ExoHost)) {
+            if ($mtastsd.DomainName -like "*.onmicrosoft.com") {
+                $resultObject.MX_Record_Pointing_To = $mxRecord.NameExchange
+                $resultObject.MTA_STS_CanBeUsed = "No"
+            }
+            elseif (($mxRecord.NameExchange.count -eq 1) -and ($mxRecord.NameExchange -like $ExoHost)) {
                 $resultObject.MX_Record_Pointing_To = $mxRecord.NameExchange
                 $resultObject.MTA_STS_CanBeUsed = "Yes"
             }
             elseif (($mxRecord.NameExchange.count -gt 1) -or ($mxRecord.NameExchange -notlike $ExoHost)) {
-                $resultObject.MX_Record_Pointing_To = "WARNING: MX Record doesn not point to Exchange Online (only). The following host(s) was/were found: $($mxRecord.NameExchange -join ", ")"
+                $resultObject.MX_Record_Pointing_To = "WARNING: MX Record does not point to Exchange Online (only). The following host(s) was/were found: $($mxRecord.NameExchange -join ", ")"
                 $resultObject.MTA_STS_CanBeUsed = "No"
             }
             else {

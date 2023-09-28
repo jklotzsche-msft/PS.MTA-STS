@@ -40,7 +40,7 @@
         $FunctionAppName,
 
         [Parameter(Mandatory = $true)]
-        [string]
+        [string[]]
         $DomainName
     )
     
@@ -56,20 +56,31 @@
             Write-Error $_
             return
         }
-        
-        # Create new domain
-        if ($DomainName -notlike "mta-sts-*") {
-            $DomainName = "mta-sts.$DomainName"
+
+        # Prepare domainname if needed
+        $DomainNamesToRemove = @()
+        foreach($dn in $DomainName) {
+            if ($dn -notlike "mta-sts.*") {
+                $DomainNamesToRemove += "mta-sts.$dn"
+            }
+            else {
+                $DomainNamesToRemove += $dn
+            }
         }
 
         # Get current domains
         $currentHostnames = Get-PSMTASTSCustomDomain -ResourceGroupName $ResourceGroupName -FunctionAppName $FunctionAppName
 
-        # Remove domain from array
-        $newHostNames = $currentHostnames | Where-Object { $_ -ne $DomainName }
-        
+        # Remove domain(s) from array
+        $newHostNames = @()
+        foreach($currentHostname in $currentHostnames) {
+            if ($currentHostname -notin $DomainNamesToRemove) {
+                $newHostNames += $currentHostname
+            }
+        }
+
         # Try to remove domain from Function App
-        if (Compare-Object -ReferenceObject $currentHostnames -DifferenceObject $newHostNames) {
+        if ($currentHostnames.count -ne $newHostNames.count) {
             Write-Verbose "Removing $($currentHostnames.count - $newHostNames.count) domains from Function App $FunctionAppName..."
             try {
                 $null = Set-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -HostNames $newHostNames -ErrorAction Stop

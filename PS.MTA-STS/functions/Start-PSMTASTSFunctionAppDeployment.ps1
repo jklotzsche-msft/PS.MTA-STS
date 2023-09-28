@@ -96,6 +96,12 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
     process {
         trap {
             Write-Error $_
+
+            # Clean up, if needed
+            if (Test-Path -Path $workingDirectory) {
+                $null = Remove-Item -Path $workingDirectory -Recurse -Force
+            }
+
             return
         }
         
@@ -103,7 +109,7 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
         Write-Verbose "Checking if location '$($Location)' is valid."
         $validLocations = Get-AzLocation | Select-Object -ExpandProperty location
         if(-not ($Location -in $validLocations)) {
-            Write-Verbose "Location '$($Location)' is not valid. Please provide one of the following values: $($validLocations -join ', ')" -ForegroundColor Red
+            Write-Verbose "Location '$($Location)' is not valid. Please provide one of the following values: $($validLocations -join ', ')"
             return
         }
 
@@ -170,6 +176,8 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
         $null = Publish-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -ArchivePath "$workingDirectory/Function.zip" -Confirm:$false -Force
         
         # Clean up
-        $null = Remove-Item -Path $workingDirectory -Recurse -Force
+        if (Test-Path -Path $workingDirectory) {
+            $null = Remove-Item -Path $workingDirectory -Recurse -Force
+        }
     }
 }
