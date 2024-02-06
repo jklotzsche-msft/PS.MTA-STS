@@ -79,7 +79,7 @@ Install-Module -Name PS.MTA-STS
 Then, run the function (edit the path to the CSV file as needed):
 
 ```PowerShell
-Export-PSMTASTSDomainsFromExo -CsvOutputPath "C:\temp\acceptedDomains.csv"
+Export-PSMTASTSDomainsFromExo -CsvPath "C:\temp\acceptedDomains.csv"
 ```
 
 Alternatively, check out the comment-based help of the function using `Get-Help -Name Export-PSMTASTSDomainsFromExo -Full` for more information.

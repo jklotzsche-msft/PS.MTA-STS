@@ -9,7 +9,7 @@
         .PARAMETER DisplayResult
         Provide a Boolean value, if the result should be displayed in the console. Default is $true.
 
-        .PARAMETER CsvOutputPath
+        .PARAMETER CsvPath
         Provide a String containing the path to the .csv file, where the result should be exported to.
 
         .PARAMETER MTASTSDomain
@@ -31,12 +31,12 @@
         Switch to run the command in a Verbose mode.
 
         .EXAMPLE
-        Export-PSMTASTSDomainsFromExo.ps1 -CsvOutputPath "C:\Temp\MTASTSDomains.csv"
+        Export-PSMTASTSDomainsFromExo.ps1 -CsvPath "C:\Temp\MTASTSDomains.csv"
 
         Gets accepted domains from Exchange Online and checks, if the MX record points to Exchange Online. The result is exported to "C:\Temp\MTASTSDomains.csv".
 
         .EXAMPLE
-        Get-AcceptedDomain -ResultSize 10 | Export-PSMTASTSDomainsFromExo.ps1 -CsvOutputPath "C:\Temp\MTASTSDomains.csv"
+        Get-AcceptedDomain -ResultSize 10 | Export-PSMTASTSDomainsFromExo.ps1 -CsvPath "C:\Temp\MTASTSDomains.csv"
 
         Gets 10 accepted domains from Exchange Online and checks, if the MX record points to Exchange Online. The result is exported to "C:\Temp\MTASTSDomains.csv".
         If you want to filter the accepted domains first, you can do so and pipe it to the Export-PSMTASTSDomainsFromExo function.
@@ -136,7 +136,7 @@
 
         # Check if the user selected any domains
         if ($null -eq $domainsToExport) {
-            Write-Verbose "No domains selected. Exiting."   
+            Write-Verbose "No domains selected. Exiting."
         }
 
         # Export the result to a .csv file
