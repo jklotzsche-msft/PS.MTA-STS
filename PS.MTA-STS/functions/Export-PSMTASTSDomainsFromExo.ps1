@@ -21,6 +21,15 @@
         .PARAMETER ExoHost
         Provide a String containing the host name of the MX record, which should be used to check, if the MX record points to Exchange Online. Default is *.mail.protection.outlook.com.
 
+        .PARAMETER CsvEncoding
+        Provide encoding of csv file. Default is "UTF8".
+
+        .PARAMETER CsvDelimiter
+        Provide delimiter of csv file. Default is ";".
+
+        .PARAMETER Verbose
+        Switch to run the command in a Verbose mode.
+
         .EXAMPLE
         Export-PSMTASTSDomainsFromExo.ps1 -CsvOutputPath "C:\Temp\MTASTSDomains.csv"
 
@@ -38,8 +47,8 @@
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [String]
-        $CsvOutputPath,
+        [string]
+        $CsvPath,
 
         [Parameter(ValueFromPipeline = $true)]
         [PSObject[]]
@@ -50,6 +59,12 @@
 
         [String]
         $DnsServerToQuery = "8.8.8.8",
+
+        [string]
+        $CsvEncoding = "UTF8",
+
+        [string]
+        $CsvDelimiter = ";",
 
         [Parameter(DontShow = $true)]
         [String]
@@ -91,7 +106,7 @@
             Write-Verbose "Checking MX record for $($mtastsd.DomainName)..."
             $mxRecord = Resolve-DnsName -Name $mtastsd.DomainName -Type MX -Server $DnsServerToQuery -ErrorAction SilentlyContinue
             if ($mtastsd.DomainName -like "*.onmicrosoft.com") {
-                $resultObject.MX_Record_Pointing_To = $mxRecord.NameExchange
+                $resultObject.MX_Record_Pointing_To = "WARNING: You cannot configure MTA-STS for an onmicrosoft.com domain."
                 $resultObject.MTA_STS_CanBeUsed = "No"
             }
             elseif (($mxRecord.NameExchange.count -eq 1) -and ($mxRecord.NameExchange -like $ExoHost)) {
@@ -113,21 +128,19 @@
     
     end {
         # Output the result in a new PowerShell window
+        $domainsToExport = $result
         if($DisplayResult) {
-            Write-Warning "Please select/highlight the domains you want to use for MTA-STS in the new PowerShell window and click OK. You can select multiple entries by holding the CTRL key and clicking on the entries OR by holding the SHIFT key and clicking on the first and last entry."
-            $domainsToExport = $result | Out-GridView -Title "Please select the domains you want to use for MTA-STS and click OK." -PassThru
+            Write-Warning "Please select/highlight the domains you want to configure MTA-STS for in the new PowerShell window and click OK. You can select multiple entries by holding the CTRL key OR by selecting your first entry, then holding the SHIFT key and selecting your last entry."
+            $domainsToExport = $result | Sort-Object -Property MTA_STS_CanBeUsed, Name | Out-GridView -Title "Please select the domains you want to use for MTA-STS and click OK." -PassThru
         }
-        else {
-            $domainsToExport = $result
+
+        # Check if the user selected any domains
+        if ($null -eq $domainsToExport) {
+            Write-Verbose "No domains selected. Exiting."   
         }
 
         # Export the result to a .csv file
-        if ($domainsToExport) {
-            Write-Verbose "Exporting $($domainsToExport.count) domain(s) to $CsvOutputPath..."
-            $domainsToExport | Export-Csv -Path $CsvOutputPath -NoTypeInformation -Encoding UTF8 -Delimiter ";" -Force
-        }
-        else {
-            Write-Verbose "No domains selected. Exiting."
-        }
+        Write-Verbose "Exporting $($domainsToExport.count) domain(s) to $CsvPath..."
+        $domainsToExport | Export-Csv -Path $CsvPath -NoTypeInformation -Encoding $CsvEncoding -Delimiter $CsvDelimiter -Force
     }
 }

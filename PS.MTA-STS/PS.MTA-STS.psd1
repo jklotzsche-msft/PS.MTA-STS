@@ -4,7 +4,7 @@
 RootModule = 'PS.MTA-STS.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.1.1'
+ModuleVersion = '1.1.2'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -22,7 +22,7 @@ CompanyName = ''
 Copyright = '(c) Jamy Klotzsche. All rights reserved.'
 
 # Description of the functionality provided by this module
-Description = 'PowerShell-Mail Transfer Agent-Strict Transport Security | Enhancing mail flow by deploying and testing MTA-STS for Exchange Online using this PowerShell module.'
+Description = 'PowerShell-Mail Transfer Agent-Strict Transport Security | Enhancing mail flow by deploying and testing MTA-STS for Exchange Online using PowerShell.'
 
 # Minimum version of the PowerShell engine required by this module
 # PowerShellVersion = ''
@@ -71,7 +71,7 @@ RequiredModules = @(
 FunctionsToExport = @(
     'Export-PSMTASTSDomainsFromExo',
 
-    'Start-PSMTASTSFunctionAppDeployment',
+    'New-PSMTASTSFunctionAppDeployment',
 
     'Add-PSMTASTSCustomDomain',
     'Get-PSMTASTSCustomDomain',

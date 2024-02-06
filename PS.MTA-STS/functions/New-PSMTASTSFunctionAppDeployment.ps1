@@ -1,4 +1,4 @@
-﻿function Start-PSMTASTSFunctionAppDeployment {
+﻿function New-PSMTASTSFunctionAppDeployment {
     <#
     .SYNOPSIS
         Creates an Azure Function App with the needed PowerShell code to publish MTA-STS policies.
@@ -8,7 +8,7 @@
         The Azure Function App will be created in the specified resource group and location.
         If the resource group doesn't exist, it will be created.
         If the Azure Function App doesn't exist, it will be created.
-        If the Azure Function App exists, it will be updated with the latest PowerShell code.
+        If the Azure Function App exists, it will be updated with the latest PowerShell code. This will overwrite any changes you made to the Azure Function App!
 
     .PARAMETER Location
         Provide the Azure location, where the Azure Function App should be created.
@@ -17,11 +17,12 @@
     .PARAMETER ResourceGroupName
         Provide the name of the Azure resource group, where the Azure Function App should be created.
         If the resource group doesn't exist, it will be created.
+        If the resource group exists already, it will be used.
     
     .PARAMETER FunctionAppName
         Provide the name of the Azure Function App, which should be created.
         If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
-        If the Azure Function App exists, it will be updated with the latest PowerShell code.
+        If the Azure Function App exists, it will be updated with the latest PowerShell code. This will overwrite any changes you made to the Azure Function App!
         
     .PARAMETER StorageAccountName
         Provide the name of the Azure Storage Account, which should be created.
@@ -34,7 +35,7 @@
         If this switch is provided, you will be asked for confirmation before any changes are made.
 
     .EXAMPLE
-        Start-PSMTASTSFunctionAppDeployment -Location 'West Europe' -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS' -StorageAccountName 'stpsmtasts'
+        New-PSMTASTSFunctionAppDeployment -Location 'West Europe' -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS' -StorageAccountName 'stpsmtasts'
         
         Creates an Azure Function App with the name 'PSMTASTS' in the resource group 'PSMTASTS' in the location 'West Europe'.
         If the resource group doesn't exist, it will be created.
@@ -123,6 +124,7 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
         $null = Set-AzDefault -ResourceGroupName $ResourceGroupName
 
         # Check, if FunctionApp exists already
+        $functionAppCreated = $false
         if($null -eq (Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -ErrorAction SilentlyContinue)) {
             # Create Storage Account
             Write-Verbose "Creating Azure Storage Account $StorageAccountName..."
@@ -150,6 +152,8 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
                 ErrorAction = 'Stop'
             }
             $null = New-AzFunctionApp @newAzFunctionAppProps
+
+            $functionAppCreated = $true
         }
 
         # Create Function App contents in temporary folder and zip it
@@ -168,8 +172,10 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
         $null = Compress-Archive -Path "$workingDirectory/function/*" -DestinationPath "$workingDirectory/Function.zip" -Force
 
         # Wait for Function App to be ready
-        Write-Verbose "Waiting for Azure Function App $($FunctionAppName) to be ready..."
-        $null = Start-Sleep -Seconds 60
+        if($functionAppCreated) {
+            Write-Verbose "Waiting for Azure Function App $($FunctionAppName) to be ready..."
+            $null = Start-Sleep -Seconds 60
+        }
 
         # Upload PowerShell code to Azure Function App
         Write-Verbose "Uploading PowerShell code to Azure Function App $($FunctionAppName)..."
