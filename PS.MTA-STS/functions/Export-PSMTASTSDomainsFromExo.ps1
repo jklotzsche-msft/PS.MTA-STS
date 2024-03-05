@@ -1,4 +1,4 @@
-﻿function Export-PSDomainomainsFromExo {
+﻿function Export-PSMTASTSDomainsFromExo {
     <#
         .SYNOPSIS
         Export-PSDomainomainsFromExo.ps1
@@ -31,15 +31,15 @@
         Switch to run the command in a Verbose mode.
 
         .EXAMPLE
-        Export-PSDomainomainsFromExo.ps1 -CsvPath "C:\Temp\Domainomains.csv"
+        Export-PSMTASTSDomainsFromExo.ps1 -CsvPath "C:\Temp\ExoDomains.csv"
 
-        Gets accepted domains from Exchange Online and checks, if the MX record points to Exchange Online. The result is exported to "C:\Temp\Domainomains.csv".
+        Gets accepted domains from Exchange Online and checks, if the MX record points to Exchange Online. The result is exported to "C:\Temp\ExoDomains.csv".
 
         .EXAMPLE
-        Get-AcceptedDomain -ResultSize 10 | Export-PSDomainomainsFromExo.ps1 -CsvPath "C:\Temp\Domainomains.csv"
+        Get-AcceptedDomain -ResultSize 10 | Export-PSMTASTSDomainsFromExo.ps1 -CsvPath "C:\Temp\ExoDomains.csv"
 
-        Gets 10 accepted domains from Exchange Online and checks, if the MX record points to Exchange Online. The result is exported to "C:\Temp\Domainomains.csv".
-        If you want to filter the accepted domains first, you can do so and pipe it to the Export-PSDomainomainsFromExo function.
+        Gets 10 accepted domains from Exchange Online and checks, if the MX record points to Exchange Online. The result is exported to "C:\Temp\ExoDomains.csv".
+        If you want to filter the accepted domains first, you can do so and pipe it to the Export-PSMTASTSDomainsFromExo function.
 
         .LINK
         https://github.com/jklotzsche-msft/PS.MTA-STS
