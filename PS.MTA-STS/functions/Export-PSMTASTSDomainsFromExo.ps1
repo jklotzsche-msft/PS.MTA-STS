@@ -1,7 +1,7 @@
-﻿function Export-PSMTASTSDomainsFromExo {
+﻿function Export-PSDomainomainsFromExo {
     <#
         .SYNOPSIS
-        Export-PSMTASTSDomainsFromExo.ps1
+        Export-PSDomainomainsFromExo.ps1
 
         .DESCRIPTION
         This script exports all domains from Exchange Online and checks, if the MX record points to Exchange Online. The result is exported to a .csv file.
@@ -12,7 +12,7 @@
         .PARAMETER CsvPath
         Provide a String containing the path to the .csv file, where the result should be exported to.
 
-        .PARAMETER MTASTSDomain
+        .PARAMETER Domainomain
         Provide a PSCustomObject containing the result of Get-AcceptedDomain. If not provided, the script will run Get-AcceptedDomain itself.
 
         .PARAMETER DnsServerToQuery
@@ -31,15 +31,15 @@
         Switch to run the command in a Verbose mode.
 
         .EXAMPLE
-        Export-PSMTASTSDomainsFromExo.ps1 -CsvPath "C:\Temp\MTASTSDomains.csv"
+        Export-PSDomainomainsFromExo.ps1 -CsvPath "C:\Temp\Domainomains.csv"
 
-        Gets accepted domains from Exchange Online and checks, if the MX record points to Exchange Online. The result is exported to "C:\Temp\MTASTSDomains.csv".
+        Gets accepted domains from Exchange Online and checks, if the MX record points to Exchange Online. The result is exported to "C:\Temp\Domainomains.csv".
 
         .EXAMPLE
-        Get-AcceptedDomain -ResultSize 10 | Export-PSMTASTSDomainsFromExo.ps1 -CsvPath "C:\Temp\MTASTSDomains.csv"
+        Get-AcceptedDomain -ResultSize 10 | Export-PSDomainomainsFromExo.ps1 -CsvPath "C:\Temp\Domainomains.csv"
 
-        Gets 10 accepted domains from Exchange Online and checks, if the MX record points to Exchange Online. The result is exported to "C:\Temp\MTASTSDomains.csv".
-        If you want to filter the accepted domains first, you can do so and pipe it to the Export-PSMTASTSDomainsFromExo function.
+        Gets 10 accepted domains from Exchange Online and checks, if the MX record points to Exchange Online. The result is exported to "C:\Temp\Domainomains.csv".
+        If you want to filter the accepted domains first, you can do so and pipe it to the Export-PSDomainomainsFromExo function.
 
         .LINK
         https://github.com/jklotzsche-msft/PS.MTA-STS
@@ -52,7 +52,7 @@
 
         [Parameter(ValueFromPipeline = $true)]
         [PSObject[]]
-        $MTASTSDomain,
+        $Domainomain,
 
         [Bool]
         $DisplayResult = $true,
@@ -84,41 +84,75 @@
         
         # Connect to Exchange Online, if not already connected
         $exchangeConnection = Get-ConnectionInformation -ErrorAction SilentlyContinue | Sort-Object -Property TokenExpiryTimeUTC -Descending | Select-Object -First 1 -ExpandProperty State
-        if (($exchangeConnection -ne "Connected") -and ($null -eq $MTASTSDomain)) {
+        if (($exchangeConnection -ne "Connected") -and ($null -eq $Domainomain)) {
             Write-Warning "Connecting to Exchange Online..."
             $null = Connect-ExchangeOnline -ShowBanner:$false -ErrorAction Stop
         }
 
-        if($null -eq $MTASTSDomain) {
+        if($null -eq $Domainomain) {
             Write-Verbose "Getting all domains from Exchange Online and checking MX-Record. Please wait..."
-            $MTASTSDomain = Get-AcceptedDomain -ResultSize unlimited | Sort-Object -Property Name
+            $AcceptedDomains = Get-AcceptedDomain -ResultSize unlimited | Sort-Object -Property Name
         }
 
-        foreach ($mtastsd in $MTASTSDomain) {
+        foreach ($Domain in $AcceptedDomains) {
         
             $resultObject = [PSCustomObject]@{
-                Name                  = $mtastsd.Name
-                DomainName            = $mtastsd.DomainName
+                Name                  = $Domain.Name
+                DomainName            = $Domain.DomainName
+                MTA_STS_TXTRecord     = ""
+                MTA_STS_Policy        = ""
                 MTA_STS_CanBeUsed     = ""
                 MX_Record_Pointing_To = ""
             }
-        
-            Write-Verbose "Checking MX record for $($mtastsd.DomainName)..."
-            $mxRecord = Resolve-DnsName -Name $mtastsd.DomainName -Type MX -Server $DnsServerToQuery -ErrorAction SilentlyContinue
-            if ($mtastsd.DomainName -like "*.onmicrosoft.com") {
+
+            #Checking MX Record
+            Write-Verbose "Checking MX record for $($Domain.DomainName)..."
+            $mxRecord = Resolve-DnsName -Name $Domain.DomainName -Type MX -Server $DnsServerToQuery -ErrorAction SilentlyContinue
+
+            #Checking MTA-STS TXT Record
+            $DNSHost = "_mta-sts." + $Domain
+            $MTASTS_TXTRecord = Resolve-DnsName -Name $DNSHost -Type TXT -ErrorAction SilentlyContinue | Where-Object {$_.Strings -match "v=STSv1"}
+            If ($Null -eq $MTASTS_TXTRecord)
+            {
+                $resultObject.MTA_STS_TXTRecord = "No"
+            } else {
+                $resultObject.MTA_STS_TXTRecord = "Yes"
+            }
+
+            #Checking MTA-STS Policy
+            $URI = "https://mta-sts.$Domain/.well-known/mta-sts.txt"
+            try {
+                $Response = Invoke-WebRequest -URI $URI -TimeoutSec 1
+                $MTASTS_Policy = ($response.Content).trim().Replace("`r`n","")
+                $resultObject.MTA_STS_Policy = $MTASTS_Policy
+            } catch {
+                #If ($Silent -ne $True)
+                #{
+                #    Write-Host "An exception was caught: $($_.Exception.Message)" -ForegroundColor Yellow
+                #}
+            }
+
+
+            if ($Domain.DomainName -like "*.onmicrosoft.com") {
                 $resultObject.MX_Record_Pointing_To = "WARNING: You cannot configure MTA-STS for an onmicrosoft.com domain."
                 $resultObject.MTA_STS_CanBeUsed = "No"
             }
             elseif (($mxRecord.NameExchange.count -eq 1) -and ($mxRecord.NameExchange -like $ExoHost)) {
                 $resultObject.MX_Record_Pointing_To = $mxRecord.NameExchange
-                $resultObject.MTA_STS_CanBeUsed = "Yes"
+                If ($Null -eq $MTASTS_TXTRecord)
+                {
+                    $resultObject.MTA_STS_CanBeUsed = "Yes"
+                } else {
+                    $resultObject.MTA_STS_CanBeUsed = "No"
+                }
+
             }
             elseif (($mxRecord.NameExchange.count -gt 1) -or ($mxRecord.NameExchange -notlike $ExoHost)) {
                 $resultObject.MX_Record_Pointing_To = "WARNING: MX Record does not point to Exchange Online (only). The following host(s) was/were found: $($mxRecord.NameExchange -join ", ")"
                 $resultObject.MTA_STS_CanBeUsed = "No"
             }
             else {
-                $resultObject.MX_Record_Pointing_To = "ERROR: No MX record found. Please assure, that the MX record for $($mtastsd.DomainName) points to Exchange Online."
+                $resultObject.MX_Record_Pointing_To = "ERROR: No MX record found. Please assure, that the MX record for $($Domain.DomainName) points to Exchange Online."
                 $resultObject.MTA_STS_CanBeUsed = "No"
             }
         
