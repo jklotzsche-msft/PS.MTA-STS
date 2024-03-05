@@ -1,7 +1,7 @@
 ﻿function Export-PSMTASTSDomainsFromExo {
     <#
         .SYNOPSIS
-        Export-PSDomainomainsFromExo.ps1
+        Export-PSMTASTSDomainsFromExo.ps1
 
         .DESCRIPTION
         This script exports all domains from Exchange Online and checks, if the MX record points to Exchange Online. The result is exported to a .csv file.
@@ -12,7 +12,7 @@
         .PARAMETER CsvPath
         Provide a String containing the path to the .csv file, where the result should be exported to.
 
-        .PARAMETER Domainomain
+        .PARAMETER MTASTSDomain
         Provide a PSCustomObject containing the result of Get-AcceptedDomain. If not provided, the script will run Get-AcceptedDomain itself.
 
         .PARAMETER DnsServerToQuery
@@ -52,7 +52,7 @@
 
         [Parameter(ValueFromPipeline = $true)]
         [PSObject[]]
-        $Domainomain,
+        $MTASTSDomain,
 
         [Bool]
         $DisplayResult = $true,
@@ -89,12 +89,12 @@
             $null = Connect-ExchangeOnline -ShowBanner:$false -ErrorAction Stop
         }
 
-        if($null -eq $Domainomain) {
+        if($null -eq $MTASTSDomain) {
             Write-Verbose "Getting all domains from Exchange Online and checking MX-Record. Please wait..."
             $AcceptedDomains = Get-AcceptedDomain -ResultSize unlimited | Sort-Object -Property Name
         }
 
-        foreach ($Domain in $AcceptedDomains) {
+        foreach ($MTASTSDomain in $AcceptedDomains) {
         
             $resultObject = [PSCustomObject]@{
                 Name                  = $Domain.Name
@@ -106,11 +106,11 @@
             }
 
             #Checking MX Record
-            Write-Verbose "Checking MX record for $($Domain.DomainName)..."
-            $mxRecord = Resolve-DnsName -Name $Domain.DomainName -Type MX -Server $DnsServerToQuery -ErrorAction SilentlyContinue
+            Write-Verbose "Checking MX record for $($MTASTSDomain.DomainName)..."
+            $mxRecord = Resolve-DnsName -Name $MTASTSDomain.DomainName -Type MX -Server $DnsServerToQuery -ErrorAction SilentlyContinue
 
             #Checking MTA-STS TXT Record
-            $DNSHost = "_mta-sts." + $Domain
+            $DNSHost = "_mta-sts." + $MTASTSDomain
             $MTASTS_TXTRecord = Resolve-DnsName -Name $DNSHost -Type TXT -ErrorAction SilentlyContinue | Where-Object {$_.Strings -match "v=STSv1"}
             If ($Null -eq $MTASTS_TXTRecord)
             {
@@ -133,7 +133,7 @@
             }
 
 
-            if ($Domain.DomainName -like "*.onmicrosoft.com") {
+            if ($MTASTSDomain.DomainName -like "*.onmicrosoft.com") {
                 $resultObject.MX_Record_Pointing_To = "WARNING: You cannot configure MTA-STS for an onmicrosoft.com domain."
                 $resultObject.MTA_STS_CanBeUsed = "No"
             }
