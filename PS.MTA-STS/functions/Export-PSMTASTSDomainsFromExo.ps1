@@ -84,7 +84,7 @@
         
         # Connect to Exchange Online, if not already connected
         $exchangeConnection = Get-ConnectionInformation -ErrorAction SilentlyContinue | Sort-Object -Property TokenExpiryTimeUTC -Descending | Select-Object -First 1 -ExpandProperty State
-        if (($exchangeConnection -ne "Connected") -and ($null -eq $Domainomain)) {
+        if (($exchangeConnection -ne "Connected") -and ($null -eq $MTASTSDomain)) {
             Write-Warning "Connecting to Exchange Online..."
             $null = Connect-ExchangeOnline -ShowBanner:$false -ErrorAction Stop
         }
@@ -97,8 +97,8 @@
         foreach ($MTASTSDomain in $AcceptedDomains) {
         
             $resultObject = [PSCustomObject]@{
-                Name                  = $Domain.Name
-                DomainName            = $Domain.DomainName
+                Name                  = $MTASTSDomain.Name
+                DomainName            = $MTASTSDomain.DomainName
                 MTA_STS_TXTRecord     = ""
                 MTA_STS_Policy        = ""
                 MTA_STS_CanBeUsed     = ""
@@ -152,7 +152,7 @@
                 $resultObject.MTA_STS_CanBeUsed = "No"
             }
             else {
-                $resultObject.MX_Record_Pointing_To = "ERROR: No MX record found. Please assure, that the MX record for $($Domain.DomainName) points to Exchange Online."
+                $resultObject.MX_Record_Pointing_To = "ERROR: No MX record found. Please assure, that the MX record for $($MTASTSDomain.DomainName) points to Exchange Online."
                 $resultObject.MTA_STS_CanBeUsed = "No"
             }
         
