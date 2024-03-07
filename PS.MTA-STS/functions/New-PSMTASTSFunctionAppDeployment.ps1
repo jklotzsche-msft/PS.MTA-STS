@@ -123,6 +123,14 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
         # Set default resource group for future cmdlets in this powershell session
         $null = Set-AzDefault -ResourceGroupName $ResourceGroupName
 
+        #Check if Storage StorageAccountName already exists
+        $DNSResult = Resolve-DnsName -Name "$StorageAccountName.blob.core.windows.net" -ErrorAction SilentlyContinue
+        If ($Null -ne $DNSResult)
+        {
+            Write-Host "Storage Account already exists" -ForegroundColor Yellow
+            #Exit
+        }
+
         # Check, if FunctionApp exists already
         $functionAppCreated = $false
         if($null -eq (Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -ErrorAction SilentlyContinue)) {
