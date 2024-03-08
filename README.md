@@ -35,12 +35,12 @@ _mta-sts.example.com.  IN TXT "v=STSv1; id=20160831085700Z;"
 The MTA-STS Policy is located at the "./well-known/" directory and contains a Text file with the Policy
 https://mta-sts.example.com/.well-known/mta-sts.txt
 
+For Exchange Online the mta-sts.txt looks like this
+
 ```
 version: STSv1
-mode: [enforce/testing/none]
-mx: mail.example.com
-mx: *.example.net
-mx: backupmx.example.com
+mode: enforce
+mx: *.mail.protection.outlook.com
 max_age: 604800
 ```
 
