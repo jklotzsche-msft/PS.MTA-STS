@@ -63,7 +63,11 @@ This module supports you at deploying and testing MTA-STS for Exchange Online. I
 You can install this module from the [PowerShell Gallery](https://www.powershellgallery.com/packages/PS.MTA-STS/).
 
 ``` Powershell
+#Install Module using PowerShellGet
 Install-Module -Name PS.MTA-STS
+
+#Install Module using Microsoft.PowerShell.PSResourceGet
+Install-PSResource -Name PS.MTA-STS
 ```
 
 ## MTA-STS Deployment
@@ -93,11 +97,8 @@ Get-Help -Name Test-MTASTSConfiguration -Full
 ```
 
 ## Resources / Links
-
-[Enhancing mail flow with MTA-STS](https://learn.microsoft.com/en-us/microsoft-365/compliance/enhancing-mail-flow-with-mta-sts?view=o365-worldwide)
-
-[Azure Static Web Apps hosting plans](https://learn.microsoft.com/en-us/azure/static-web-apps/plans)
-
-[Azure Functions hosting options](https://learn.microsoft.com/en-us/azure/azure-functions/functions-scale)
-
-[RFC 8461: SMTP MTA Strict Transport Security (MTA-STS)](https://datatracker.ietf.org/doc/html/rfc8461)
+- [Enhancing mail flow with MTA-STS](https://learn.microsoft.com/en-us/microsoft-365/compliance/enhancing-mail-flow-with-mta-sts?view=o365-worldwide)
+- [Azure Static Web Apps hosting plans](https://learn.microsoft.com/en-us/azure/static-web-apps/plans)
+- [Azure Functions hosting options](https://learn.microsoft.com/en-us/azure/azure-functions/functions-scale)
+- [RFC 8461: SMTP MTA Strict Transport Security (MTA-STS)](https://datatracker.ietf.org/doc/html/rfc8461)
+- [RFC 8460: SMTP TLS Reporting (TLSRPT)](https://datatracker.ietf.org/doc/html/rfc8460)
