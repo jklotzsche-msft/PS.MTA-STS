@@ -113,7 +113,7 @@ PrivateData = @{
         # ProjectUri = ''
 
         # A URL to an icon representing this module.
-        # IconUri = ''
+        IconUri = 'https://raw.githubusercontent.com/jklotzsche-msft/PS.MTA-STS/d7de833919d9bc5e1d7eccc218dbce8e57a03467/docs/_images/PS.MTA-STS-Logo.jpg'
 
         # ReleaseNotes of this module
         # ReleaseNotes = ''
