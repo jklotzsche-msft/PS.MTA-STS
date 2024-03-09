@@ -3,7 +3,12 @@
     "version": "2.0",
     "extensions": {
         "http": {
-        "routePrefix": ""
+        "routePrefix": "",
+            "customHeaders": {
+                "Permissions-Policy": "geolocation=()",
+                "X-Frame-Options": "SAMEORIGIN",
+                "Content-Security-Policy": "default-src 'self'
+            }
         }
     },
     "managedDependency": {
