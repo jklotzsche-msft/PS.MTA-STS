@@ -133,16 +133,16 @@
                 #}
             }
 
-			#Checking TLSRPT Record
-			#_smtp._tls.example.com. IN TXT "v=TLSRPTv1;rua=mailto:reports@example.com"			
-			$DNSHost = "_smtp._tls." + $MTASTSDomain
-			$TLSRPT_TXTRecord = Resolve-DnsName -Name $DNSHost -Type TXT -ErrorAction SilentlyContinue | Where-Object {$_.Strings -match "v=TLSRPTv1"}
-			If ($Null -eq $TLSRPT_TXTRecord)
-			{
-				$resultObject.TLSRPT = ""
-			} else {
-				$resultObject.TLSRPT = $TLSRPT_TXTRecord.Strings[0]
-			}
+            #Checking TLSRPT Record
+            #_smtp._tls.example.com. IN TXT "v=TLSRPTv1;rua=mailto:reports@example.com"
+            $DNSHost = "_smtp._tls." + $MTASTSDomain
+            $TLSRPT_TXTRecord = Resolve-DnsName -Name $DNSHost -Type TXT -ErrorAction SilentlyContinue | Where-Object {$_.Strings -match "v=TLSRPTv1"}
+            If ($Null -eq $TLSRPT_TXTRecord)
+            {
+                $resultObject.TLSRPT = ""
+            } else {
+                $resultObject.TLSRPT = $TLSRPT_TXTRecord.Strings[0]
+            }
 
             if ($MTASTSDomain.DomainName -like "*.onmicrosoft.com") {
                 $resultObject.MX_Record_Pointing_To = "WARNING: You cannot configure MTA-STS for an onmicrosoft.com domain."
