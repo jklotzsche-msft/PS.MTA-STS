@@ -107,7 +107,7 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
         }
         
         # Check, if Location is valid
-        Write-Verbose "Checking if location '$($Location)' is valid."
+        Write-Host "Checking if location '$($Location)' is valid."
         $validLocations = Get-AzLocation | Select-Object -ExpandProperty location
         if(-not ($Location -in $validLocations)) {
             Write-Verbose "Location '$($Location)' is not valid. Please provide one of the following values: $($validLocations -join ', ')"
@@ -115,6 +115,7 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
         }
 
         # Create, if resource group doesn't exist already. If it doesn't exist, create it.
+        Write-Host "Checking if ResourceGroup alredy exists"
         if ($null -eq (Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue)) {
             Write-Verbose "Creating Azure Resource Group $($ResourceGroupName)..."
             $null = New-AzResourceGroup -Name $ResourceGroupName -Location $Location
@@ -124,18 +125,28 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
         $null = Set-AzDefault -ResourceGroupName $ResourceGroupName
 
         #Check if Storage StorageAccountName already exists
+        Write-Host "Checking if Storage Account exists in DNS"
         $DNSResult = Resolve-DnsName -Name "$StorageAccountName.blob.core.windows.net" -ErrorAction SilentlyContinue
         If ($Null -ne $DNSResult)
         {
-            Write-Host "Storage Account already exists" -ForegroundColor Yellow
-            #Exit
+            Write-Host "Storage Account already exists" -ForegroundColor Red
+            break
+        }
+
+        #Check Function App Name available
+        Write-Host "Checking if Function Account exists in DNS"
+        $DNSFunctionApp = Resolve-DnsName -Name "$FunctionAppName.azurewebsites.net" -ErrorAction SilentlyContinue
+        If ($Null -ne $DNSFunctionApp)
+        {
+            Write-Host "Storage Account already exists" -ForegroundColor Red
+            break
         }
 
         # Check, if FunctionApp exists already
         $functionAppCreated = $false
         if($null -eq (Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -ErrorAction SilentlyContinue)) {
             # Create Storage Account
-            Write-Verbose "Creating Azure Storage Account $StorageAccountName..."
+            Write-Host "Creating Azure Storage Account $StorageAccountName..."
             $newAzStorageAccountProps = @{
                 ResourceGroupName = $ResourceGroupName
                 Name = $StorageAccountName
@@ -147,7 +158,7 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
             $null = New-AzStorageAccount @newAzStorageAccountProps
 
             # Create Function App
-            Write-Verbose "Creating Azure Function App $FunctionAppName..."
+            Write-Host "Creating Azure Function App $FunctionAppName..."
             $newAzFunctionAppProps = @{
                 ResourceGroupName = $ResourceGroupName
                 Name = $FunctionAppName
@@ -159,39 +170,52 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
                 RuntimeVersion = '7.2'
                 ErrorAction = 'Stop'
             }
-            $null = New-AzFunctionApp @newAzFunctionAppProps
+            $AzFunctionAppObject = New-AzFunctionApp @newAzFunctionAppProps
 
             $functionAppCreated = $true
         }
 
         # Create Function App contents in temporary folder and zip it
+        Write-Host "Creating Functions in Temp Folder..."
         $workingDirectory = Join-Path -Path $env:TEMP -ChildPath "PS.MTA-STS_deployment"
         if (Test-Path -Path $workingDirectory) {
-            $null = Remove-Item -Path $workingDirectory -Recurse -Force
+            $null = Get-ChildItem -Path $workingDirectory -Recurse | Remove-Item -Recurse -Force -Confirm:$false 
         }
-        $null = New-Item -Path $workingDirectory -ItemType Directory
-        $null = New-Item -Path "$workingDirectory/function" -ItemType Directory
-        $null = $PSMTASTS_hostJson | Set-Content -Path "$workingDirectory/function/host.json" -Force
-        $null = $PSMTASTS_profilePs1 | Set-Content -Path "$workingDirectory/function/profile.ps1" -Force
-        $null = $PSMTASTS_requirementsPsd1 | Set-Content -Path "$workingDirectory/function/requirements.psd1" -Force
-        $null = New-Item -Path "$workingDirectory/function/Publish-MTASTSPolicy" -ItemType Directory
-        $null = $PSMTASTS_functionJson | Set-Content -Path "$workingDirectory/function/Publish-MTASTSPolicy/function.json" -Force
-        $null = $PSMTASTS_runPs1 | Set-Content -Path "$workingDirectory/function/Publish-MTASTSPolicy/run.ps1" -Force
-        $null = Compress-Archive -Path "$workingDirectory/function/*" -DestinationPath "$workingDirectory/Function.zip" -Force
+        $null = New-Item -Path $workingDirectory -ItemType Directory -ErrorAction SilentlyContinue
+        $null = New-Item -Path "$workingDirectory\function" -ItemType Directory
+        $null = $PSMTASTS_hostJson | Set-Content -Path "$workingDirectory\function\host.json" -Force
+        $null = $PSMTASTS_profilePs1 | Set-Content -Path "$workingDirectory\function\profile.ps1" -Force
+        $null = $PSMTASTS_requirementsPsd1 | Set-Content -Path "$workingDirectory\function\requirements.psd1" -Force
+        #Root Website
+        $null = New-Item -Path "$workingDirectory\function\WebsiteRoot" -ItemType Directory
+        $null = $Root_functionJson | Set-Content -Path "$workingDirectory\function\WebsiteRoot\function.json" -Force
+        $null = $Root_runPs1 | Set-Content -Path "$workingDirectory\function\WebsiteRoot\run.ps1" -Force
+        #MTA-STS Policy
+        $null = New-Item -Path "$workingDirectory\function\MTA-STS" -ItemType Directory
+        $null = $PSMTASTS_functionJson | Set-Content -Path "$workingDirectory\function\MTA-STS\function.json" -Force
+        $null = $PSMTASTS_runPs1 | Set-Content -Path "$workingDirectory\function\MTA-STS\run.ps1" -Force
+        $null = Compress-Archive -Path "$workingDirectory\function\*" -DestinationPath "$workingDirectory/Function.zip" -Force
 
         # Wait for Function App to be ready
         if($functionAppCreated) {
-            Write-Verbose "Waiting for Azure Function App $($FunctionAppName) to be ready..."
+            Write-Host "Waiting for Azure Function App $($FunctionAppName) to be ready..."
             $null = Start-Sleep -Seconds 60
         }
 
         # Upload PowerShell code to Azure Function App
-        Write-Verbose "Uploading PowerShell code to Azure Function App $($FunctionAppName)..."
+        Write-Host "Uploading PowerShell code to Azure Function App $($FunctionAppName)..."
         $null = Publish-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -ArchivePath "$workingDirectory/Function.zip" -Confirm:$false -Force
         
         # Clean up
+        Write-Host "Cleanup Temp Folder"
         if (Test-Path -Path $workingDirectory) {
-            $null = Remove-Item -Path $workingDirectory -Recurse -Force
+            $null = Get-ChildItem -Path $workingDirectory -Recurse | Remove-Item -Recurse -Force -Confirm:$false
         }
+
+        $DefaultHostName = $AzFunctionAppObject.DefaultHostName
+        $id = (get-date).Tostring("yyyyMMddHHmm00Z")
+        Write-Host "Now you need to create the DNS Entry for your domains" -ForegroundColor Cyan
+        Write-Host "_mta-sts.yourdomain.tld TXT v=STSv1; id=$id" -ForegroundColor Cyan
+        Write-Host "mta-sts.yourdomain.tld CNAME $DefaultHostName" -ForegroundColor Cyan
     }
 }
