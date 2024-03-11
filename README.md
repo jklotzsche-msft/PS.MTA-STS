@@ -16,6 +16,44 @@ This module is for you, if you ...
 
 MTA-STS is a new internet standard that improves email security and delivery for your organization. MTA-STS leverages the well-known security standard HTTPS, which is used to secure connections to websites, to enable organizations to assert policies and requirements for their email services. MTA-STS also enables organizations to request that remote email servers deliver email messages over a secure connection and to report back on any failures encountered. This helps to ensure that email messages are delivered in a secure and reliable manner.
 
+
+## SMTP MTA Strict Transport Security (MTA-STS)
+Defined in [rfc8461](https://datatracker.ietf.org/doc/html/rfc8461)
+
+MTA-STS consists of two Parts:
+- MTA-STS TXT DNS Record
+- MTA-STS Policy
+ 
+### MTA-STS TXT Record
+This DNS Record indicates that the Domain supports MTA-STS. The id can be literally anything it's usualy just a datetime value of the last change.
+
+```
+_mta-sts.example.com.  IN TXT "v=STSv1; id=20160831085700Z;"
+```
+
+###  MTA-STS Policy
+The MTA-STS Policy is located at the "./well-known/" directory and contains a Text file with the Policy
+https://mta-sts.example.com/.well-known/mta-sts.txt
+
+For Exchange Online the mta-sts.txt looks like this
+
+```
+version: STSv1
+mode: enforce
+mx: *.mail.protection.outlook.com
+max_age: 604800
+```
+
+## SMTP TLS Reporting (TLSRPT)
+Defined in [rfc8460](https://datatracker.ietf.org/doc/html/rfc8460)
+
+This DNS Record allows the Sender MTA to send Reports (similar to DMARC) to a defined Emailadress or a HTML Site for reporting purposes. While Microsoft does not offer a Service to aggregate these Reports, there are plenty of TLSRPT Data providers that can do this Job.
+
+```
+_smtp._tls.example.com. IN TXT "v=TLSRPTv1;rua=mailto:reports@example.com"
+_smtp._tls.example.com. IN TXT "v=TLSRPTv1; rua=https://reporting.example.com/v1/tlsrpt"
+```
+
 ## What does this module do?
 
 This module supports you at deploying and testing MTA-STS for Exchange Online. It will help you to create the required DNS records and to configure the MTA-STS policy for your domain. It will also help you to test the MTA-STS policy and to troubleshoot any issues you might encounter.
@@ -25,7 +63,11 @@ This module supports you at deploying and testing MTA-STS for Exchange Online. I
 You can install this module from the [PowerShell Gallery](https://www.powershellgallery.com/packages/PS.MTA-STS/).
 
 ``` Powershell
+#Install Module using PowerShellGet
 Install-Module -Name PS.MTA-STS
+
+#Install Module using Microsoft.PowerShell.PSResourceGet
+Install-PSResource -Name PS.MTA-STS
 ```
 
 ## MTA-STS Deployment
@@ -55,11 +97,8 @@ Get-Help -Name Test-MTASTSConfiguration -Full
 ```
 
 ## Resources / Links
-
-[Enhancing mail flow with MTA-STS](https://learn.microsoft.com/en-us/microsoft-365/compliance/enhancing-mail-flow-with-mta-sts?view=o365-worldwide)
-
-[Azure Static Web Apps hosting plans](https://learn.microsoft.com/en-us/azure/static-web-apps/plans)
-
-[Azure Functions hosting options](https://learn.microsoft.com/en-us/azure/azure-functions/functions-scale)
-
-[RFC 8461: SMTP MTA Strict Transport Security (MTA-STS)](https://datatracker.ietf.org/doc/html/rfc8461)
+- [Enhancing mail flow with MTA-STS](https://learn.microsoft.com/en-us/microsoft-365/compliance/enhancing-mail-flow-with-mta-sts?view=o365-worldwide)
+- [Azure Static Web Apps hosting plans](https://learn.microsoft.com/en-us/azure/static-web-apps/plans)
+- [Azure Functions hosting options](https://learn.microsoft.com/en-us/azure/azure-functions/functions-scale)
+- [RFC 8461: SMTP MTA Strict Transport Security (MTA-STS)](https://datatracker.ietf.org/doc/html/rfc8461)
+- [RFC 8460: SMTP TLS Reporting (TLSRPT)](https://datatracker.ietf.org/doc/html/rfc8460)
