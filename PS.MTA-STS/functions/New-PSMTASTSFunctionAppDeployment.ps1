@@ -34,6 +34,9 @@
     .PARAMETER Confirm
         If this switch is provided, you will be asked for confirmation before any changes are made.
 
+    .PARAMETER Policy
+        Specifies if the policy is in "Enforce" mode or "Testing" mode
+
     .EXAMPLE
         New-PSMTASTSFunctionAppDeployment -Location 'West Europe' -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS' -StorageAccountName 'stpsmtasts'
         
@@ -63,7 +66,11 @@
 
         [Parameter(Mandatory = $true)]
         [String]
-        $StorageAccountName
+        $StorageAccountName,
+
+        [Parameter()]
+        [String]
+        $PolicyMode="enforce"
     )
     #endregion Parameter
 
@@ -85,6 +92,12 @@
             throw @"
 The following modules are missing: '{0}'. Please install them using "Install-Module -Name '{0}'
 "@ -f ($missingModules -join "', '")
+        }
+
+        if ($PolicyMode -ne "Testing" -and $PolicyMode -ne "Enforce" -and $PolicyMode -ne "None"){
+            throw @"
+            PolicyMode must be "Enforce"(default), "Testing" or "None"
+"@
         }
 
         # Check if PowerShell is connected to Azure
@@ -156,6 +169,14 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
             $functionAppCreated = $true
         }
 
+        function setMode([String]$policy,[String]$mode){
+          if ($mode -eq "enforce"){ 
+            return $policy
+          } else {
+            return $policy.replace("mode: enforce","mode: "+$mode.ToLower())
+          }
+        }
+
         # Create Function App contents in temporary folder and zip it
         $workingDirectory = Join-Path -Path $env:TEMP -ChildPath "PS.MTA-STS_deployment"
         if (Test-Path -Path $workingDirectory) {
@@ -168,7 +189,11 @@ The following modules are missing: '{0}'. Please install them using "Install-Mod
         $null = $PSMTASTS_requirementsPsd1 | Set-Content -Path "$workingDirectory/function/requirements.psd1" -Force
         $null = New-Item -Path "$workingDirectory/function/Publish-MTASTSPolicy" -ItemType Directory
         $null = $PSMTASTS_functionJson | Set-Content -Path "$workingDirectory/function/Publish-MTASTSPolicy/function.json" -Force
-        $null = $PSMTASTS_runPs1 | Set-Content -Path "$workingDirectory/function/Publish-MTASTSPolicy/run.ps1" -Force
+        
+        $runPs1 = setMode $PSMTASTS_runPs1 $PolicyMode 
+        Write-Verbose "Creating policy in $PolicyMode mode"
+        $null = $runPs1 | Set-Content -Path "$workingDirectory/function/Publish-MTASTSPolicy/run.ps1" -Force
+        #$null = $PSMTASTS_runPs1 | Set-Content -Path "$workingDirectory/function/Publish-MTASTSPolicy/run.ps1" -Force
         $null = Compress-Archive -Path "$workingDirectory/function/*" -DestinationPath "$workingDirectory/Function.zip" -Force
 
         # Wait for Function App to be ready
