@@ -138,7 +138,8 @@
         }
 
         # Add the current domains to the list of new domains
-        $newCustomDomains = $currentHostnames + $customDomainsToAdd
+        # forcing currentHostnames to be an array, it could be a string if only single name is present.
+        $newCustomDomains = @($currentHostnames) + $customDomainsToAdd
     }
     
     process {
