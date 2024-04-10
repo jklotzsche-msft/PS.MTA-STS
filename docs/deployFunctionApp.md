@@ -386,7 +386,11 @@ To verify that your MTA-STS policy is working, you can use the [Test-PSMTASTSCon
     Test-PSMTASTSConfiguration -CsvPath "C:\temp\acceptedDomains.csv" -FunctionAppName "func-PSMTASTS" -ExportResult -ResultPath "C:\temp\mta-sts-result.csv"   
 ```
 
-## CONGRATULATIONS! You have successfully configured MTA-STS for your domains
+CONGRATULATIONS! You have successfully configured MTA-STS for your domains.
 
-You made a huge step towards a more secure email communication. Now, you can sit back and relax. Your MTA-STS policy will be published automatically. It is recommended to monitor your Azure Function App, so you can react quickly in case of an error. To learn how to create a alert rule for your function app check out [Create or edit an alert rule
+## Conclusion
+
+You made a huge step towards a more secure email communication. Now, you can sit back and relax. Your MTA-STS policy will be published automatically. It is recommended to monitor your Azure Function App, so you can react quickly in case of an error. To learn how to create a alert rule for your function app check out the [PS.MTA-STS Alert rule recommendation](./configureAlertRule.md) or follow the instructions in the official Microsoft documentation [Create or edit an alert rule
 ](https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-create-new-alert-rule?tabs=metric)
+
+We are looking forward to your feedback. If you have any questions or suggestions, please feel free to open an issue in the [PS.MTA-STS GitHub repository](https://github.com/jklotzsche-msft/PS.MTA-STS/issues).
