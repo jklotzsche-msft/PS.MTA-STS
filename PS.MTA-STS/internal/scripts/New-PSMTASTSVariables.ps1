@@ -3,7 +3,15 @@
     "version": "2.0",
     "extensions": {
         "http": {
-        "routePrefix": ""
+        "routePrefix": "",
+            "customHeaders": {
+                "Permissions-Policy": "geolocation=()",
+                "X-Frame-Options": "SAMEORIGIN",
+                "Content-Security-Policy": "default-src 'self'",
+                "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+                "X-Content-Type-Options": "nosniff",
+                "Referrer-Policy": "no-referrer"
+            }
         }
     },
     "managedDependency": {
@@ -13,7 +21,7 @@
         "id": "Microsoft.Azure.Functions.ExtensionBundle",
         "version": "[3.*, 4.0.0)"
     }
-    }
+}
 '@
 
 $script:PSMTASTS_profilePs1 = @'
@@ -49,6 +57,66 @@ $script:PSMTASTS_requirementsPsd1 = @'
 }
 '@
 
+#Root Function Json
+$script:Root_functionJson = @'
+{
+    "bindings": [
+        {
+            "authLevel": "ANONYMOUS",
+            "type": "httpTrigger",
+            "direction": "in",
+            "name": "Request",
+            "methods": [
+                "get"
+            ],
+            "route": "/"
+        },
+        {
+            "type": "http",
+            "direction": "out",
+            "name": "Response"
+        }
+    ]
+}
+'@
+
+#Root Script
+$script:Root_runPs1 = @'
+using namespace System.Net
+
+# Input bindings are passed in via param block.
+param($Request, $TriggerMetadata)
+
+# Write to the Azure Functions log stream.
+Write-Host "PowerShell HTTP trigger function processed a request."
+
+# Create HTML
+$body = @"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>MTA-STS</title>
+</head>
+<body>
+	<hl>MTA-STS Static Website Index</hl>
+	<p>Looking for the <a href="./.well-known/mta-sts.txt">mta-sts.txt</a>?</p>
+	
+</body>
+</html>
+"@
+
+# Associate values to output bindings by calling 'Push-OutputBinding'.
+Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+    StatusCode = [HttpStatusCode]::OK
+    Headers = @{
+        "content-type" = "text/html"
+    }
+    Body = $body
+})
+'@
+
+#MTA-STS Poliy Function JSON
 $script:PSMTASTS_functionJson = @'
 {
     "bindings": [
@@ -71,6 +139,9 @@ $script:PSMTASTS_functionJson = @'
 }
 '@
 
+
+
+#MTA-STS Poliy Script
 $script:PSMTASTS_runPs1 = @'
 param (
  $Request,

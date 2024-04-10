@@ -87,57 +87,62 @@
 
         if ($DomainName) {
             $domainList = @()
-            foreach ($domain in $DomainName) { $domainList += @{DomainName = $domain } }
+            foreach ($domain in $DomainName) { $domainList += $domain}
         }
+    }
+
+    process {
+
+        #Check FunctionApp
+        Write-Host "Get Azure Function App"
+        $FunctionAppResult = Get-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+        If ($Null -eq $FunctionAppResult)
+        {
+            #Function App not found
+            Write-Host "FunctionApp $FunctionAppName not found"
+            Break
+        }
+
+        #Get CustomDomain Names
+        Write-Host "Get CustomDomainNames from Azure Function App"
+        [Array]$CustomDomainNames = Get-PSMTASTSCustomDomain -ResourceGroupName $ResourceGroupName -FunctionAppName $FunctionAppName -ErrorAction Stop
 
         # Prepare new domains
         $removeCustomDomains = @()
         foreach ($domain in $domainList) {
+            
+            Write-Host "Working on Domain: $Domain"
             # Check, if domain has correct format
-            if ($domain.DomainName -notmatch "^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+$") {
-                Write-Error -Message "Domain $($domain.DomainName) has incorrect format. Please provide domain in format 'contoso.com'."
+            if ($domain -notmatch "^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+$") {
+                Write-Error -Message "Domain $($domain) has incorrect format. Please provide domain in format 'contoso.com'."
                 return
             }
 
-            # Prepare new domain
-            if ($domain.DomainName -notlike "mta-sts.*") {
-                Write-Verbose "Adding prefix 'mta-sts.' to domain $($domain.DomainName)..."
-                $domain.DomainName = "mta-sts.$($domain.DomainName)"
-            }
-
-            # Add new domain to list of domains
-            if ($domain.DomainName -notin $removeCustomDomains) {
-                Write-Verbose "Adding domain $($domain.DomainName) to list of domains..."
-                $removeCustomDomains += $domain.DomainName
+            #Check if CustomDomain is added as Custom Domain
+            $MTASTSDomain = "mta-sts." + $domain
+            If ($CustomDomainNames -match $MTASTSDomain)
+            {
+                #Custom Domain is present
+                Write-Host "Adding Domain to Array" -ForegroundColor Green
+                $removeCustomDomains += $MTASTSDomain 
+            } else {
+                #Custom Domain not present
+                Write-Host "Custom Domain not present.Skipping..." -ForegroundColor Yellow
             }
         }
 
-        # Check, if a domain name is already used in our Function App
-        $currentHostnames = Get-PSMTASTSCustomDomain -ResourceGroupName $ResourceGroupName -FunctionAppName $FunctionAppName -ErrorAction Stop
-        $customDomainsToRemove = @()
-        foreach ($newDomain in $removeCustomDomains) {
-            if ($newDomain -notin $currentHostnames) {
-                Write-Verbose "Domain $newDomain does not exists in Function App $FunctionAppName. Skipping..."
-                continue
-            }
 
-            Write-Verbose "Adding domain $newDomain to list of domains, which should be removed from Function App $FunctionAppName..."
-            $customDomainsToRemove += $newDomain
-        }
-
-        # Add the current domains to the list of domains to remove
-        $newCustomDomains = Compare-Object -ReferenceObject $currentHostnames -DifferenceObject $customDomainsToRemove | Where-Object -FilterScript {$_.SideIndicator -eq "<="} | Select-Object -ExpandProperty InputObject
-    }
-    
-    process {
         # Check, if there are new domains to remove
-        if ($customDomainsToRemove.count -eq 0) {
-            Write-Verbose "No domains to remove from Function App $FunctionAppName."
+        if ($removeCustomDomains.count -eq 0) {
+            Write-Host "No domains to remove from Function App $FunctionAppName."
             return
         }
 
+        # Add the current domains to the list of domains to remove
+        $newCustomDomains = Compare-Object -ReferenceObject $CustomDomainNames -DifferenceObject $removeCustomDomains | Where-Object -FilterScript {$_.SideIndicator -eq "<="} | Select-Object -ExpandProperty InputObject
+
         # Remove domains from Function App
-        Write-Verbose "Removing $($customDomainsToRemove.count) domains from Function App $FunctionAppName : $($customDomainsToRemove -join ", ")..."
+        Write-Host "Removing $($removeCustomDomains.count) domains from Function App $FunctionAppName : $($removeCustomDomains -join ", ")..." -ForegroundColor Green
         $setAzWebApp = @{
             ResourceGroupName = $ResourceGroupName
             Name              = $FunctionAppName
@@ -155,5 +160,23 @@
             Write-Error -Message $_.Exception.Message
             return
         }
+
+		#Remove Managed Certificate if needed
+		Write-Host "Remove Certificates" -ForegroundColor Green
+		[Array]$WebAppCertificates = Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName
+		Foreach ($Certificate in $WebAppCertificates)
+		{
+			$SubjectName = $Certificate.SubjectName
+			If ($SubjectName -match $removeCustomDomains)
+			{
+				#Get Thumbprint of Certificate
+				$Thumbprint = $Certificate.Thumbprint
+				
+				#Remove Managed Certificate
+				Write-Host "Remove Managed Certificate: $SubjectName Thumbprint: $Thumbprint"
+				Remove-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -Thumbprint $Thumbprint
+			}
+		}
+
     }
 }

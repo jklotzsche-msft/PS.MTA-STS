@@ -76,7 +76,10 @@
 
         [Parameter(ParameterSetName = "Csv")]
         [string]
-        $CsvDelimiter = ";"
+        $CsvDelimiter = ";",
+
+        [String]
+        $DnsServerToQuery = "8.8.8.8"
     )
     
     begin {
@@ -91,64 +94,85 @@
             $domainList = Import-Csv -Path $CsvPath -Encoding $CsvEncoding -Delimiter $CsvDelimiter -ErrorAction Stop
         }
 
-        if ($DomainName) {
+        if ($DomainName) 
+        {
             $domainList = @()
-            foreach ($domain in $DomainName) { $domainList += @{DomainName = $domain } }
+            #foreach ($domain in $DomainName) { $domainList += @{DomainName = $domain } }
+            foreach ($domain in $DomainName) { $domainList += $domain } 
+        }
+    }
+
+    process {
+
+        #Check FunctionApp
+        Write-Host "Get Azure Function App"
+        $FunctionAppResult = Get-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+        If ($Null -eq $FunctionAppResult)
+        {
+            #Function App not found
+            Write-Host "FunctionApp $FunctionAppName not found"
+            Break
         }
 
+        #Get CustomDomain Names
+        Write-Host "Get CustomDomainNames from Azure Function App"
+        [Array]$CustomDomainNames = Get-PSMTASTSCustomDomain -ResourceGroupName $ResourceGroupName -FunctionAppName $FunctionAppName -ErrorAction Stop
+
         # Prepare new domains
-        $newCustomDomains = @()
-        foreach ($domain in $domainList) {
+        #$newCustomDomains = @()
+        $customDomainsToAdd = @()
+        foreach ($domain in $domainList) 
+        {
+            Write-Host "Working on Domain: $Domain"
             # Check, if domain has correct format
-            if ($domain.DomainName -notmatch "^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+$") {
-                Write-Error -Message "Domain $($domain.DomainName) has incorrect format. Please provide domain in format 'contoso.com'."
+            if ($domain -notmatch "^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+$") {
+                Write-Error -Message "Domain $domain has incorrect format. Please provide domain in format 'contoso.com'."
                 return
             }
 
-            # Prepare new domain
-            if ($domain.DomainName -notlike "mta-sts.*") {
-                Write-Verbose "Adding prefix 'mta-sts.' to domain $($domain.DomainName)..."
-                $domain.DomainName = "mta-sts.$($domain.DomainName)"
+            #Check if mta-sts.domain.tld CNAME $FunctionAppName.azurewebsites.net
+            Write-Host "Checking CNAME: mta-sts.$Domain CNAME $FunctionAppName.azurewebsites.net"
+            $MTASTSDomain = "mta-sts." + $domain
+            #Write-Host "Debug: MTASTSDomain: $MTASTSDomain"
+            $MTASTS_CNAME = Resolve-DnsName -Name $MTASTSDomain -Server $DnsServerToQuery -Type CNAME -ErrorAction SilentlyContinue | Where-Object {$_.NameHost -eq "$FunctionAppName.azurewebsites.net"} | Select-Object NameHost
+            #Write-Host "Debug: MTASTS_CNAME: $MTASTS_CNAME"
+            If ($Null -eq $MTASTS_CNAME)
+            {
+                Write-Host "CNAME not found"
+            } else {
+                If ($MTASTS_CNAME.NameHost -ne $("$FunctionAppName.azurewebsites.net"))
+                {
+                    Write-Host "CNAME does not match FunctionApp"
+                } else {
+                    #CNAME Matches
+                    #Check if CustomDomain is already added as Custom Domain
+                    If ($CustomDomainNames -match $MTASTSDomain)
+                    {
+                        #Custom Domain already present
+                        Write-Host "Custom Domain already present" -ForegroundColor Yellow
+                    } else {
+                        #Custom Domain not present
+                        Write-Host "Adding Domain to Array" -ForegroundColor Green
+                        $customDomainsToAdd += $MTASTSDomain 
+                    }
+                }
             }
-
-            # Add new domain to list of domains
-            if ($domain.DomainName -notin $newCustomDomains) {
-                Write-Verbose "Adding domain $($domain.DomainName) to list of domains..."
-                $newCustomDomains += $domain.DomainName
-            }
-        }
-
-        # Check, if a domain name is already used in our Function App
-        $currentHostnames = Get-PSMTASTSCustomDomain -ResourceGroupName $ResourceGroupName -FunctionAppName $FunctionAppName -ErrorAction Stop
-        $customDomainsToAdd = @()
-        foreach ($newDomain in $newCustomDomains) {
-            if ($newDomain -in $currentHostnames) {
-                Write-Verbose "Domain $newDomain already exists in Function App $FunctionAppName. Skipping..."
-                continue
-            }
-
-            Write-Verbose "Adding domain $newDomain to list of domains, which should be added to Function App $FunctionAppName..."
-            $customDomainsToAdd += $newDomain
         }
 
         # Check, if there are new domains to add
         if ($customDomainsToAdd.count -eq 0) {
-            Write-Verbose "No new domains to add to Function App $FunctionAppName."
+            Write-Host "No new domains to add to Function App $FunctionAppName."
             return
         }
 
-        # Add the current domains to the list of new domains
-        # forcing currentHostnames to be an array, it could be a string if only single name is present.
-        $newCustomDomains = @($currentHostnames) + $customDomainsToAdd
-    }
-    
-    process {
         # Add new domains to Function App
-        Write-Verbose "Adding $($customDomainsToAdd.count) domains to Function App $FunctionAppName : $($customDomainsToAdd -join ", ")..."
+        $customDomainsToAdd += $CustomDomainNames
+        Write-Host "Add CustomDomains to Function App" -ForegroundColor Green
+        #Write-Verbose "Adding $($customDomainsToAdd.count) domains to Function App $FunctionAppName : $($customDomainsToAdd -join ", ")..."
         $setAzWebApp = @{
             ResourceGroupName = $ResourceGroupName
             Name              = $FunctionAppName
-            HostNames         = $newCustomDomains
+            HostNames         = $customDomainsToAdd
             ErrorAction       = "Stop"
             WarningAction     = "Stop"
         }
@@ -157,15 +181,9 @@
             if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Add custom domains")) {
                 $null = Set-AzWebApp @setAzWebApp
             }
-        }
-        catch {
-            if ($_.Exception.Message -like "*A TXT record pointing from*was not found*") {
-                Write-Warning -Message $_.Exception.Message
-            }
-            else {
-                Write-Error -Message $_.Exception.Message
-                return
-            }
+        } catch {
+            Write-Error -Message $_.Exception.Message
+            return
         }
 
         # Stop here, if we should not add managed certificate
@@ -175,7 +193,9 @@
         }
 
         # Add managed certificate to Function App
-        foreach ($customDomainToAdd in $customDomainsToAdd) {
+        Write-Host "Add Managed Certificate to Function App" -ForegroundColor Green
+        foreach ($customDomainToAdd in $customDomainsToAdd) 
+        {
             Write-Verbose "Adding certificate for $customDomainToAdd..."
             $newAzWebAppCertificate = @{
                 ResourceGroupName = $ResourceGroupName

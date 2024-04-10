@@ -25,7 +25,7 @@ Copyright = '(c) Jamy Klotzsche. All rights reserved.'
 Description = 'PowerShell-Mail Transfer Agent-Strict Transport Security | Enhancing mail flow by deploying and testing MTA-STS for Exchange Online using PowerShell.'
 
 # Minimum version of the PowerShell engine required by this module
-# PowerShellVersion = ''
+PowerShellVersion = '5.1'
 
 # Name of the PowerShell host required by this module
 # PowerShellHostName = ''
@@ -113,7 +113,7 @@ PrivateData = @{
         # ProjectUri = ''
 
         # A URL to an icon representing this module.
-        # IconUri = ''
+        IconUri = 'https://raw.githubusercontent.com/jklotzsche-msft/PS.MTA-STS/d7de833919d9bc5e1d7eccc218dbce8e57a03467/docs/_images/PS.MTA-STS-Logo.jpg'
 
         # ReleaseNotes of this module
         # ReleaseNotes = ''
