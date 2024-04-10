@@ -125,7 +125,7 @@ max_age: 604800
                 $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
             }
             else {
-                $resultObject.MTA_STS_TXT = "TXT record was not found. Please check if the TXT record for $mtaStsName points to the Function App $($resultObject.Host)."
+                $resultObject.MTA_STS_TXT = "TXT record was not found. Please check if the TXT record for _$mtaStsName exists and contains the content: $txtRecordContent."
                 $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
             }
 
