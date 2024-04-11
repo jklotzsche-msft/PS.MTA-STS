@@ -21,5 +21,6 @@ foreach ($dependency in $data.RequiredModules) {
 foreach ($module in $modules) {
     Write-Host "Installing $module" -ForegroundColor Cyan
     Install-Module $module -Force -SkipPublisherCheck -Repository $Repository -AllowClobber
-    Import-Module $module -Force -PassThru
+    # Disabled, because of bug with "Az.Functions" module
+    ## Import-Module $module -Force -PassThru
 }
