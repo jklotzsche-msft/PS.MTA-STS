@@ -62,14 +62,14 @@ $script:Root_functionJson = @'
 {
     "bindings": [
         {
+            "route": "/",
             "authLevel": "ANONYMOUS",
-            "type": "httpTrigger",
-            "direction": "in",
-            "name": "Request",
             "methods": [
                 "get"
             ],
-            "route": "/"
+            "type": "httpTrigger",
+            "direction": "in",
+            "name": "Request"
         },
         {
             "type": "http",
@@ -82,38 +82,47 @@ $script:Root_functionJson = @'
 
 #Root Script
 $script:Root_runPs1 = @'
-using namespace System.Net
-
 # Input bindings are passed in via param block.
 param($Request, $TriggerMetadata)
 
 # Write to the Azure Functions log stream.
-Write-Host "PowerShell HTTP trigger function processed a request."
+Write-Host "Trigger: Static website index has been requested."
 
 # Create HTML
-$body = @"
+$staticWebsiteIndex = @"
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8">
-	<title>MTA-STS</title>
+    <meta charset="UTF-8">
+    <title>MTA-STS</title>
 </head>
 <body>
-	<hl>MTA-STS Static Website Index</hl>
-	<p>Looking for the <a href="./.well-known/mta-sts.txt">mta-sts.txt</a>?</p>
-	
+    <hl>MTA-STS Static Website Index</hl>
+    <p>Looking for the <a href="./.well-known/mta-sts.txt">mta-sts.txt</a>?</p>
 </body>
 </html>
 "@
 
-# Associate values to output bindings by calling 'Push-OutputBinding'.
-Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-    StatusCode = [HttpStatusCode]::OK
-    Headers = @{
-        "content-type" = "text/html"
-    }
-    Body = $body
-})
+# Return the response
+try {
+    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        StatusCode = [System.Net.HttpStatusCode]::OK
+        Headers = @{
+            "content-type" = "text/html"
+        }
+        Body = $staticWebsiteIndex
+    })
+}
+catch {
+ # Return error, if something went wrong
+ Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        StatusCode = [System.Net.HttpStatusCode]::InternalServerError
+        Headers = @{
+            "Content-type" = "text/plain"
+        }
+        Body = $_.Exception.Message
+    })
+}
 '@
 
 #MTA-STS Poliy Function JSON
@@ -121,39 +130,35 @@ $script:PSMTASTS_functionJson = @'
 {
     "bindings": [
         {
-        "name": "Request",
-        "route": ".well-known/mta-sts.txt",
-        "authLevel": "anonymous",
-        "methods": [
-            "get"
-        ],
-        "direction": "in",
-        "type": "httpTrigger"
+            "route": ".well-known/mta-sts.txt",
+            "authLevel": "anonymous",
+            "methods": [
+                "get"
+            ],
+            "type": "httpTrigger",
+            "direction": "in",
+            "name": "Request"
         },
         {
-        "type": "http",
-        "direction": "out",
-        "name": "Response"
+            "type": "http",
+            "direction": "out",
+            "name": "Response"
         }
     ]
 }
 '@
 
-
-
 #MTA-STS Poliy Script
 $script:PSMTASTS_runPs1 = @'
-param (
- $Request,
+param ($Request, $TriggerMetadata)
 
- $TriggerMetadata
-)
-
+# Write to the Azure Functions log stream.
 Write-Host "Trigger: MTA-STS policy has been requested."
 
 # Prepare the response body
-# Replace 'enforce' with 'testing' to test the policy without enforcing it
-$PSMTASTS_mtaStsPolicy = @"
+## Replace 'enforce' with 'testing' to test the policy without enforcing it
+## Or use the "Update-PSMTASTSFunctionAppDeployment" function to update the policy and other function app files to the current version
+$mtaStsPolicy = @"
 version: STSv1
 mode: enforce
 mx: *.mail.protection.outlook.com
@@ -167,7 +172,7 @@ try {
         Headers = @{
             "Content-type" = "text/plain"
         }
-        Body = $PSMTASTS_mtaStsPolicy
+        Body = $mtaStsPolicy
     })
 }
 catch {

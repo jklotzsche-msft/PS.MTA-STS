@@ -30,9 +30,6 @@
         .PARAMETER Confirm
         Switch to run the command in a Confirm mode.
 
-        .PARAMETER Verbose
-        Switch to run the command in a Verbose mode.
-
         .EXAMPLE
         Remove-PSMTASTSCustomDomain -CsvPath "C:\temp\accepted-domains.csv" -ResourceGroupName "MTA-STS" -FunctionAppName "MTA-STS-FunctionApp"
 
@@ -74,109 +71,110 @@
     )
     
     begin {
+        # Check, if we are connected to Azure
         if ($null -eq (Get-AzContext)) {
-            Write-Warning "Connecting to Azure service..."
+            Write-Warning "Connecting to Azure service"
             $null = Connect-AzAccount -ErrorAction Stop
         }
 
+        # Import csv file with accepted domains
         if ($CsvPath) {
-            # Import csv file with accepted domains
-            Write-Verbose "Importing csv file from $CsvPath..."
-            $domainList = Import-Csv -Path $CsvPath -Encoding $CsvEncoding -Delimiter $CsvDelimiter -ErrorAction Stop
+            Write-Verbose "Importing csv file from $CsvPath"
+            $domainList = Import-Csv -Path $CsvPath -Encoding $CsvEncoding -Delimiter $CsvDelimiter -ErrorAction Stop | Select-Object -ExpandProperty DomainName
         }
 
+        # Import domains from input parameter
         if ($DomainName) {
+            Write-Verbose "Creating array of domains from input parameter"
             $domainList = @()
-            foreach ($domain in $DomainName) { $domainList += $domain}
+            foreach ($domain in $DomainName) { $domainList += $domain }
+        }
+
+        # Check, if domains have correct format
+        foreach ($domain in $domainList) {
+            if ($domain -notmatch "^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+$") {
+                Write-Error -Message "Domain $domain has incorrect format. Please provide domain in format 'contoso.com'."
+                return
+            }
         }
     }
 
     process {
+        # Preset ErrorActionPreference to Stop
+        $ErrorActionPreference = "Stop"
+
+        # Trap errors
+        trap {
+            Write-Error $_
+            return
+        }
 
         #Check FunctionApp
-        Write-Host "Get Azure Function App"
+        Write-Verbose "Get Azure Function App $FunctionAppName in Resource Group $ResourceGroupName"
         $FunctionAppResult = Get-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
-        If ($Null -eq $FunctionAppResult)
-        {
+        if ($null -eq $FunctionAppResult) {
             #Function App not found
-            Write-Host "FunctionApp $FunctionAppName not found"
-            Break
+            throw "FunctionApp $FunctionAppName not found"
         }
 
         #Get CustomDomain Names
-        Write-Host "Get CustomDomainNames from Azure Function App"
-        [Array]$CustomDomainNames = Get-PSMTASTSCustomDomain -ResourceGroupName $ResourceGroupName -FunctionAppName $FunctionAppName -ErrorAction Stop
+        Write-Verbose "Get CustomDomainNames from Azure Function App $FunctionAppName"
+        $customDomainNames = Get-PSMTASTSCustomDomain -ResourceGroupName $ResourceGroupName -FunctionAppName $FunctionAppName -ErrorAction Stop
 
         # Prepare new domains
         $removeCustomDomains = @()
         foreach ($domain in $domainList) {
-            
-            Write-Host "Working on Domain: $Domain"
-            # Check, if domain has correct format
-            if ($domain -notmatch "^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+$") {
-                Write-Error -Message "Domain $($domain) has incorrect format. Please provide domain in format 'contoso.com'."
-                return
-            }
-
             #Check if CustomDomain is added as Custom Domain
-            $MTASTSDomain = "mta-sts." + $domain
-            If ($CustomDomainNames -match $MTASTSDomain)
-            {
+            $mtaStsDomain = "mta-sts." + $domain
+            if ($mtaStsDomain -in $CustomDomainNames.CustomDomains) {
                 #Custom Domain is present
-                Write-Host "Adding Domain to Array" -ForegroundColor Green
-                $removeCustomDomains += $MTASTSDomain 
-            } else {
-                #Custom Domain not present
-                Write-Host "Custom Domain not present.Skipping..." -ForegroundColor Yellow
+                Write-Verbose "Adding Domain to Array of Domains to remove: $mtaStsDomain"
+                $removeCustomDomains += $mtaStsDomain
             }
         }
 
-
         # Check, if there are new domains to remove
         if ($removeCustomDomains.count -eq 0) {
-            Write-Host "No domains to remove from Function App $FunctionAppName."
+            Write-Warning "No domains to remove from Function App $FunctionAppName. Stopping here."
             return
         }
 
         # Add the current domains to the list of domains to remove
-        $newCustomDomains = Compare-Object -ReferenceObject $CustomDomainNames -DifferenceObject $removeCustomDomains | Where-Object -FilterScript {$_.SideIndicator -eq "<="} | Select-Object -ExpandProperty InputObject
+        $newCustomDomains = Compare-Object -ReferenceObject $CustomDomainNames.CustomDomains -DifferenceObject $removeCustomDomains | Where-Object -FilterScript {$_.SideIndicator -eq "<="} | Select-Object -ExpandProperty InputObject
+        $customDomainsToSet = @()
+        $customDomainsToSet += $customDomainNames.DefaultDomain # Add default domain
+        $customDomainsToSet += $newCustomDomains # Add custom domains to keep
 
         # Remove domains from Function App
-        Write-Host "Removing $($removeCustomDomains.count) domains from Function App $FunctionAppName : $($removeCustomDomains -join ", ")..." -ForegroundColor Green
+        Write-Verbose "Removing $($removeCustomDomains.count) domains from Function App $FunctionAppName : $($removeCustomDomains -join ", ")..."
         $setAzWebApp = @{
             ResourceGroupName = $ResourceGroupName
             Name              = $FunctionAppName
-            HostNames         = $newCustomDomains
+            HostNames         = $customDomainsToSet
             ErrorAction       = "Stop"
             WarningAction     = "Stop"
         }
-
-        try {
-            if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Remove custom domains")) {
-                $null = Set-AzWebApp @setAzWebApp
-            }
-        }
-        catch {
-            Write-Error -Message $_.Exception.Message
-            return
+        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Remove custom domains")) {
+            $null = Set-AzWebApp @setAzWebApp
         }
 
 		#Remove Managed Certificate if needed
-		Write-Host "Remove Certificates" -ForegroundColor Green
-		[Array]$WebAppCertificates = Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName
-		Foreach ($Certificate in $WebAppCertificates)
-		{
-			$SubjectName = $Certificate.SubjectName
-			If ($SubjectName -match $removeCustomDomains)
-			{
+		Write-Verbose "Remove Certificates"
+		[Array]$webAppCertificates = Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName
+		foreach ($certificate in $webAppCertificates) {
+			$subjectName = $certificate.SubjectName
+			if ($subjectName -in $removeCustomDomains) {
 				#Get Thumbprint of Certificate
-				$Thumbprint = $Certificate.Thumbprint
+				$thumbprint = $certificate.Thumbprint
 				
 				#Remove Managed Certificate
-				Write-Host "Remove Managed Certificate: $SubjectName Thumbprint: $Thumbprint"
-				Remove-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -Thumbprint $Thumbprint
+				Write-Verbose "Remove Managed Certificate: $subjectName Thumbprint: $thumbprint"
+                if ($PSCmdlet.ShouldProcess("Subject: $subjectName, Thumbprint: $thumbprint", "Remove managed certificate")) {
+                    # If an error occurs during certificate removal, continue with the next certificate removal as the certificate might be used elsewhere
+                    # If we do not continue anyways, users would have to remove the certificate manually for next domains
+				    $null = Remove-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -Thumbprint $thumbprint -Confirm:$false -ErrorAction Continue
+                }
 			}
 		}
-
     }
 }

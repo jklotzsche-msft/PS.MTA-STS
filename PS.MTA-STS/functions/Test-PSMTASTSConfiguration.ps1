@@ -11,18 +11,21 @@
         - ...policy file is available and
         - ...MX record is configured correctly.
 
-        .PARAMETER DisplayResult
-        Provide a Boolean value, if the result should be displayed in the console. Default is $true.
-
         .PARAMETER CsvPath
         Provide path to csv file with accepted domains.
         Csv file should have one column with header "DomainName" and list of domains in each row.
 
-        .PARAMETER FunctionAppName
-        Provide name of Function App.
+        .PARAMETER DomainName
+        Provide list of domains.
 
         .PARAMETER DnsServer
         Provide IP address of DNS server to use for DNS queries. Default is 8.8.8.8 (Google DNS).
+
+        .PARAMETER DisplayResult
+        Provide a Boolean value, if the result should be displayed in the console. Default is $true.
+
+        .PARAMETER FunctionAppName
+        Provide name of Function App.
 
         .PARAMETER ExportResult
         Switch Parameter. Export result to CSV file.
@@ -30,14 +33,14 @@
         .PARAMETER ResultPath
         Provide path to CSV file where result should be exported. Default is "C:\temp\mta-sts-result.csv".
 
+        .PARAMETER CsvEncoding
+        Provide encoding of csv file. Default is "UTF8".
+
+        .PARAMETER CsvDelimiter
+        Provide delimiter of csv file. Default is ";".
+
         .PARAMETER ExoHost
         Provide a String containing the host name of the MX record, which should be used to check, if the MX record points to Exchange Online. Default is *.mail.protection.outlook.com.
-
-        .PARAMETER WhatIf
-        Switch to run the command in a WhatIf mode.
-
-        .PARAMETER Confirm
-        Switch to run the command in a Confirm mode.
 
         .EXAMPLE
         Test-PSMTASTSConfiguration -CsvPath "C:\temp\accepted-domains.csv" -FunctionAppName "MTA-STS-FunctionApp"
@@ -49,14 +52,23 @@
 
         Reads list of accepted domains from "C:\temp\accepted-domains.csv" and checks if MTA-STS is configured correctly for each domain in Function App "MTA-STS-FunctionApp". It also exports result to "C:\temp\mta-sts-result.csv".
     #>
-    [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess = $true)]
+    [CmdletBinding(DefaultParameterSetName = "CsvWithExport")]
     param(
-        [Parameter(Mandatory = $true)]
-        [String]
+        [Parameter(Mandatory = $true, ParameterSetName = "CsvWithExport")]
+        [Parameter(Mandatory = $true, ParameterSetName = "CsvWithoutExport")]
+        [string]
         $CsvPath,
-        
-        [Parameter(Mandatory = $true)]
-        [String]
+
+        [Parameter(Mandatory = $true, ParameterSetName = "ManualWithExport")]
+        [Parameter(Mandatory = $true, ParameterSetName = "ManualWithoutExport")]
+        [string[]]
+        $DomainName,
+
+        [Parameter(Mandatory = $true, ParameterSetName = "CsvWithExport")]
+        [Parameter(Mandatory = $true, ParameterSetName = "CsvWithoutExport")]
+        [Parameter(Mandatory = $true, ParameterSetName = "ManualWithExport")]
+        [Parameter(Mandatory = $true, ParameterSetName = "ManualWithoutExport")]
+        [string]
         $FunctionAppName,
 
         [String]
@@ -65,73 +77,111 @@
         [Bool]
         $DisplayResult = $true,
 
-        [Parameter(ParameterSetName = "ExportResult")]
+        [Parameter(ParameterSetName = "CsvWithExport")]
+        [Parameter(ParameterSetName = "ManualWithExport")]
         [Switch]
         $ExportResult,
     
-        [Parameter(Mandatory = $true, ParameterSetName = "ExportResult")]
+        [Parameter(ParameterSetName = "CsvWithExport")]
+        [Parameter(ParameterSetName = "ManualWithExport")]
         [String]
-        $ResultPath,
+        $ResultPath = (Join-Path -Path $env:TEMP -ChildPath "$(Get-Date -Format yyyyMMddhhmmss)_mta-sts-test-result.csv"),
+
+        [string]
+        $CsvEncoding = "UTF8",
+
+        [string]
+        $CsvDelimiter = ";",
 
         [Parameter(DontShow = $true)]
         [String]
         $ExoHost = "*.mail.protection.outlook.com"
     )
 
+    begin {
+        # Prepare result array
+        $result = @()
+
+        # Import csv file with accepted domains
+        if ($CsvPath) {
+            Write-Verbose "Importing csv file from $CsvPath"
+            $domainList = Import-Csv -Path $CsvPath -Encoding $CsvEncoding -Delimiter $CsvDelimiter -ErrorAction Stop | Select-Object -ExpandProperty DomainName
+        }
+    }
+
     process {
+        # Preset ErrorActionPreference to Stop
+        $ErrorActionPreference = "Stop"
+
+        # Trap errors
         trap {
             Write-Error $_
             return
         }
 
+        # Import domains from input parameter
+        if ($DomainName) {
+            Write-Verbose "Creating array of domains from input parameter"
+            $domainList = @()
+            foreach ($domain in $DomainName) { $domainList += $domain }
+        }
+
+        # Check, if domains have correct format
+        foreach ($domain in $domainList) {
+            if ($domain -notmatch "^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+$") {
+                Write-Error -Message "Domain $domain has incorrect format. Please provide domain in format 'contoso.com'."
+                return
+            }
+        }
+
         # Prepare variables
-        $csv = Import-Csv -Path $CsvPath -Encoding UTF8 -Delimiter ";" -ErrorAction Stop
         $txtRecordContent = "v=STSv1; id=*Z;"
         $mtaStsPolicyFileContent = @"
 version: STSv1
-mode: enforce
+mode: *
 mx: $ExoHost
 max_age: 604800
 "@
         $counter = 1
-        $result = @()
 
         # Loop through all domains
-        foreach ($line in $csv) {
-            Write-Verbose "$counter / $($csv.count) - $($line.DomainName)"
-
+        foreach ($domain in $domainList) {
+            Write-Verbose "Checking $counter / $($domainList.count) - $($domain)"
             # Prepare result object
             $resultObject = [PSCustomObject]@{
-                DomainName         = $line.DomainName
-                Host               = "$FunctionAppName.azurewebsites.net"
-                MTA_STS_TXT        = ""
-                MTA_STS_CNAME      = ""
-                MTA_STS_PolicyFile = ""
-                MTA_STS_MX         = ""
-                MTA_STS_OVERALL    = "OK"
+                DomainName            = $domain
+                Host                  = "$FunctionAppName.azurewebsites.net"
+                MX_Record_Pointing_To = ""
+                MX_Record_Result      = ""
+                MTA_STS_CNAME         = ""
+                MTA_STS_Policy        = ""
+                MTA_STS_PolicyContent = ""
+                MTA_STS_TXTRecord     = ""
+                MTA_STS_OVERALL       = "OK"
+                TLSRPT                = ""
             }
 
-            # Prepare MTA-STS name
-            $mtaStsName = "mta-sts.$($line.DomainName)"
+            # Checking MTA-STS TXT Record
+            # Example: _mta-sts.example.com. IN TXT "v=STSv1; id=20160831085700Z"
+            $mtaStsDNSHost = "_mta-sts." + $domain
+            $mtaStsTXTRecord = Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer -ErrorAction Stop | Where-Object { $_.Strings -match "v=STSv1" }
 
-            # Check MTA-STS TXT record
-            Write-Verbose "...Checking MTA-STS TXT record for $mtaStsName."
-            $txtRecord = Resolve-DnsName -Name "_$mtaStsName" -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue
-            if ($txtRecord -and ($txtRecord.strings -like $txtRecordContent)) {
-                $resultObject.MTA_STS_TXT = "OK"
+            if ($mtaStsTXTRecord -and ($mtaStsTXTRecord.strings -like $txtRecordContent)) {
+                $resultObject.MTA_STS_TXTRecord = "OK"
             }
-            elseif ($txtRecord -and ($txtRecord.strings -notlike $txtRecordContent)) {
-                $resultObject.MTA_STS_TXT = "TXT record does not contain the expected content. The following content was found: $($txtRecord.strings -join ", ")"
+            elseif ($mtaStsTXTRecord -and ($mtaStsTXTRecord.strings -notlike $txtRecordContent)) {
+                $resultObject.MTA_STS_TXTRecord = "TXT record does not contain the expected content. The following content was found: $($txtRecord.strings -join ", ")"
                 $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
             }
             else {
-                $resultObject.MTA_STS_TXT = "TXT record was not found. Please check if the TXT record for $mtaStsName points to the Function App $($resultObject.Host)."
+                $resultObject.MTA_STS_TXTRecord = "TXT record was not found."
                 $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
             }
 
             # Check MTA-STS CNAME record
-            Write-Verbose "...Checking MTA-STS CNAME record for $mtaStsName."
-            $cnameRecord = Resolve-DnsName -Name $mtaStsName -Type CNAME -Server $DnsServer -ErrorAction SilentlyContinue
+            $mtaStsName = "mta-sts." + $domain
+            $cnameRecord = Resolve-PSMTASTSDnsName -Name $mtaStsName -Type CNAME -Server $DnsServer -ErrorAction Stop
+
             if ($cnameRecord -and ($resultObject.Host -eq $cnameRecord.NameHost)) {
                 $resultObject.MTA_STS_CNAME = "OK"
             }
@@ -144,54 +194,85 @@ max_age: 604800
                 $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
             }
     
-            # Check MTA-STS Policy File
-            Write-Verbose "...Checking MTA-STS Policy File for $mtaStsName."
-            $mtaStsPolicyUrl = "https://$mtaStsName/.well-known/mta-sts.txt"
-            $policyFile = $null
+            # Checking MTA-STS Policy
+            <# Example:
+                version: STSv1
+                mode: enforce
+                mx: *.mail.protection.outlook.com
+                max_age: 604800
+            #>
+            $mtaStsUri = "https://mta-sts.{0}/.well-known/mta-sts.txt" -f $domain
+            Write-Verbose "...checking MTA-STS Policy file at $mtaStsUri"
             
             try {
-                $policyFile = Invoke-WebRequest -Uri $mtaStsPolicyUrl -ErrorAction SilentlyContinue
+                $mtaStsPolicyResponse = Invoke-WebRequest -Uri $mtaStsUri -TimeoutSec 20 -ErrorAction SilentlyContinue
+                $resultObject.MTA_STS_PolicyContent = ($mtaStsPolicyResponse.Content).Trim()
             }
             catch {
-                $resultObject.MTA_STS_PolicyFile = $_.Exception.Message
+                $resultObject.MTA_STS_Policy = "ERROR"
+                $resultObject.MTA_STS_PolicyContent = $_.Exception.Message
                 $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
             }
 
-            if ($policyFile -and ($policyFile.Content -eq $mtaStsPolicyFileContent)) {
-                $resultObject.MTA_STS_PolicyFile = "OK"
-            }
-            if ($policyFile -and ($policyFile.Content -ne $mtaStsPolicyFileContent)) {
-                $resultObject.MTA_STS_PolicyFile = "Policy file does not contain the expected content. The following content was found: $($policyFile.Content)"
-                $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
-            }
-
-            # Check MX record
-            Write-Verbose "...Checking MX record for $($line.DomainName)."
-            $mxRecord = Resolve-DnsName -Name $line.DomainName -Type MX -Server $DnsServer -ErrorAction SilentlyContinue
-            if (($mxRecord.NameExchange.count -eq 1) -and ($mxRecord.NameExchange -like $ExoHost)) {
-                $resultObject.MTA_STS_MX = "OK"
-            }
-            elseif (($mxRecord.NameExchange.count -ne 1) -or ($mxRecord.NameExchange -notlike $ExoHost)) {
-                $resultObject.MTA_STS_MX = "MX record does not contain the expected content. The following content was found: $($mxRecord.NameExchange -join ", ")"
-                $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
+            if (($resultObject.MTA_STS_PolicyContent -like $mtaStsPolicyFileContent) -and (($resultObject.MTA_STS_PolicyContent -like "*mode: enforce*") -or ($resultObject.MTA_STS_PolicyContent -like "*mode: testing*") -or ($resultObject.MTA_STS_PolicyContent -like "*mode: none*"))) {
+                $resultObject.MTA_STS_Policy = "OK"
             }
             else {
-                $resultObject.MTA_STS_MX = "MX record was not found. Please check if the MX record for $($line.DomainName) points to Exchange Online."
+                $resultObject.MTA_STS_Policy = "Policy file does not contain the expected content."
                 $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
             }
 
+            # Checking TLSRPT Record
+            # Example: _smtp._tls.example.com. IN TXT "v=TLSRPTv1;rua=mailto:reports@example.com"
+            $tlsRptDNSHost = "_smtp._tls." + $domain
+            $tlsRptRecord = Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction Stop | Where-Object -FilterScript {$_.Strings -like "v=TLSRPTv1*"}
+
+            if ($null -ne $tlsRptRecord) {
+                $resultObject.TLSRPT = $tlsRptRecord.Strings[0]
+            }
+
+            # Checking MX Record
+            # Example: example.com. IN MX 0 example-com.mail.protection.outlook.com.
+            $mxRecord = Resolve-PSMTASTSDnsName -Name $domain -Type MX -Server $DnsServer -ErrorAction Stop
+
+            $resultObject.MX_Record_Pointing_To = $mxRecord.NameExchange -join ", "
+
+            # Check if the domain is an onmicrosoft.com domain
+            if ($domain -like "*.onmicrosoft.com") {
+                $resultObject.MX_Record_Result = "WARNING: You cannot configure MTA-STS for an onmicrosoft.com domain."
+                $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
+            }
+            # Check if the MX record points to Exchange Online
+            elseif (($mxRecord.NameExchange.count -eq 1) -and ($mxRecord.NameExchange -like $ExoHost)) {
+                # MX record points to Exchange Online (only)
+                $resultObject.MX_Record_Result = "OK"
+            }
+            # Check if the MX record points to another host than Exchange Online or if multiple MX records were found
+            elseif (($mxRecord.NameExchange.count -gt 1) -or ($mxRecord.NameExchange -notlike $ExoHost)) {
+                $resultObject.MX_Record_Result = "WARNING: MX Record does not point to Exchange Online (only). The following host(s) was/were found: $($mxRecord.NameExchange -join ", ")"
+            }
+            # Assume, that no MX record was found
+            else {
+                $resultObject.MX_Record_Result = "ERROR: No MX record found. Please assure, that the MX record for $domain points to Exchange Online."
+            }
+
+            # Add the result to the result array
+            Write-Verbose "...adding result to result array."
             $result += $resultObject
+
+            # Increase the counter for verbose output
             $counter++
         }
 
         # Output the result in a new PowerShell window
-        if($DisplayResult) {
+        if ($DisplayResult) {
             Write-Warning "Please check the results in the new PowerShell window."
             $result | Out-GridView -Title "Test MTA-STS Configuration"
         }
 
         # Export result to CSV
         if ($ExportResult) {
+            Write-Warning "Exporting result to $ResultPath"
             $result | Export-Csv -Path $ResultPath -Encoding UTF8 -Delimiter ";" -NoTypeInformation
         }
     }

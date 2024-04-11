@@ -4,7 +4,7 @@
 RootModule = 'PS.MTA-STS.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.1.2'
+ModuleVersion = '1.2.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -72,6 +72,7 @@ FunctionsToExport = @(
     'Export-PSMTASTSDomainsFromExo',
 
     'New-PSMTASTSFunctionAppDeployment',
+    'Update-PSMTASTSFunctionAppFile',
 
     'Add-PSMTASTSCustomDomain',
     'Get-PSMTASTSCustomDomain',

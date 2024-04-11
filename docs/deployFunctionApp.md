@@ -1,6 +1,7 @@
 ﻿# Deploy MTA-STS using a Azure Function App
 
-This guide will help you to deploy MTA-STS for your domain(s) using a Azure Function App. If you want to deploy MTA-STS using a Azure Static Web App, check out [the original deployment guide](https://learn.microsoft.com/en-us/microsoft-365/compliance/enhancing-mail-flow-with-mta-sts?view=o365-worldwide#option-1-recommended-azure-static-web-app).<br>
+This guide will help you to deploy MTA-STS for your domain(s) using a Azure Function App. If you want to deploy MTA-STS using a Azure Static Web App, check out [the original deployment guide](https://learn.microsoft.com/en-us/microsoft-365/compliance/enhancing-mail-flow-with-mta-sts?view=o365-worldwide#option-1-recommended-azure-static-web-app).
+
 > **NOTE** Please remember, that you can only add [5 custom domains per Azure Static Web App](https://learn.microsoft.com/en-us/azure/static-web-apps/plans#features), while you can add [500 custom domains per Azure Function App](https://learn.microsoft.com/en-us/azure/azure-functions/functions-scale#service-limits). So if you want to configure MTA-STS for more than 5 domains, it is highly recommended to use a Azure Function App.
 
 ## Table of Contents
@@ -18,14 +19,17 @@ This guide will help you to deploy MTA-STS for your domain(s) using a Azure Func
     - [Step 4.2: Add custom domains to Azure Function App manually](#step-42-add-custom-domains-to-azure-function-app-manually)
   - [Step 5: Create TXT record in public DNS to enable MTA-STS](#step-5-create-txt-record-in-public-dns-to-enable-mta-sts)
   - [Step 6: Verify MTA-STS policy](#step-6-verify-mta-sts-policy)
-- [CONGRATULATIONS! You have successfully configured MTA-STS for your domains](#congratulations-you-have-successfully-configured-mta-sts-for-your-domains)
+- [CONGRATULATIONS! You have successfully configured MTA-STS for your domains](#conclusion)
+  - [Monitoring and Reporting](#monitoring-and-reporting)
+  - [TLS-RPT](#tls-rpt)
+  - [Feedback](#feedback)
 
 ## Prerequisites
 
 1. active Azure Subscription, to create the required Azure resources
 2. Permissions to create resources (Resource Group, Function App, Storage Account)
 
-> **NOTE** Please make sure you have the required permissions to create the Azure resources and that there are no policies in place, which prevent you from using PowerShell to deploy Azure resources. If you are not sure, please contact your Azure Administrator.
+  > **NOTE** Please make sure you have the required permissions to create the Azure resources and that there are no policies in place, which prevent you from using PowerShell to deploy Azure resources. If you are not sure, please contact your Azure Administrator.
 
 3. PowerShell modules
     - [Az.Accounts](https://www.powershellgallery.com/packages/Az.Accounts)
@@ -109,12 +113,14 @@ Now that you prepared the list of domains you want to deploy MTA-STS for, we can
 
 To create all resources automatically use the function "New-PSMTASTSFunctionAppDeployment" and provide your desired Azure Location, Resource Group Name, Function App Name and Storage Account Name. If any of these resources already exist, the function will use the existing resources. If you are not connected to Azure already, you will be prompted to authenticate in your last used browser. After the authentication, the function will create and configure the resources.
 
+> The automatic deployment can take a few minutes. Please be patient. Add the `-Verbose` parameter to the function below to see the progress.
+
 ```PowerShell
 # Create resource group and Azure Function App
-New-PSMTASTSFunctionAppDeployment -Location "westeurope" -ResourceGroupName "rg-PSMTASTS" -FunctionAppName "func-PSMTASTS" -StorageAccountName "storagepsmtasts"
+New-PSMTASTSFunctionAppDeployment -Location "westeurope" -ResourceGroupName "rg-PSMTASTS" -FunctionAppName "func-PSMTASTS" -StorageAccountName "storagepsmtasts" -PolicyMode "Enforce"
 ```
 
-> **NOTE** This will publish a MTA-STS policy in enforce mode for the domain. If you want to test the policy without enforcing it, replace 'enforce' with 'testing' in the $mtaStsPolicy variable **after the deployment**. You can find the code in the run.ps1 file of the function. Check out the [manual deployment steps](#step-22-create-azure-resources-manually) for more information about the run.ps1 file and how to edit it.
+> **NOTE** This will publish a MTA-STS policy in enforce mode for the domain. If you want to test the policy without enforcing it, replace 'enforce' with 'testing' or use the "Update-PSMTASTSFunctionAppDeployment" function to update the policy and other function app files to the current version.
 
 This will look like this:
 
@@ -170,19 +176,27 @@ Select "App files" and replace the contents of "host.json", "profile.ps1" and "r
 
 ```json
 {
-  "version": "2.0",
-  "extensions": {
-    "http": {
-      "routePrefix": ""
+    "version": "2.0",
+    "extensions": {
+        "http": {
+        "routePrefix": "",
+            "customHeaders": {
+                "Permissions-Policy": "geolocation=()",
+                "X-Frame-Options": "SAMEORIGIN",
+                "Content-Security-Policy": "default-src 'self'",
+                "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+                "X-Content-Type-Options": "nosniff",
+                "Referrer-Policy": "no-referrer"
+            }
+        }
+    },
+    "managedDependency": {
+        "Enabled": false
+    },
+    "extensionBundle": {
+        "id": "Microsoft.Azure.Functions.ExtensionBundle",
+        "version": "[3.*, 4.0.0)"
     }
-  },
-  "managedDependency": {
-    "Enabled": false
-  },
-  "extensionBundle": {
-    "id": "Microsoft.Azure.Functions.ExtensionBundle",
-    "version": "[3.*, 4.0.0)"
-  }
 }
 ```
 
@@ -238,16 +252,14 @@ Now, we can add the code to the function. To do so, select "Code + Test" and cop
 1. run.ps1
 
 ```PowerShell
-param (
- $Request,
+param ($Request, $TriggerMetadata)
 
- $TriggerMetadata
-)
-
+# Write to the Azure Functions log stream.
 Write-Host "Trigger: MTA-STS policy has been requested."
 
 # Prepare the response body
-# Replace 'enforce' with 'testing' to test the policy without enforcing it
+## Replace 'enforce' with 'testing' to test the policy without enforcing it
+## Or use the "Update-PSMTASTSFunctionAppDeployment" function to update the policy and other function app files to the current version
 $mtaStsPolicy = @"
 version: STSv1
 mode: enforce
@@ -284,21 +296,93 @@ catch {
 ```json
 {
   "bindings": [
-    {
-      "name": "Request",
-      "route": ".well-known/mta-sts.txt",
-      "authLevel": "anonymous",
-      "methods": [
-        "get"
-      ],
-      "direction": "in",
-      "type": "httpTrigger"
-    },
-    {
-      "type": "http",
-      "direction": "out",
-      "name": "Response"
-    }
+      {
+          "route": ".well-known/mta-sts.txt",
+          "authLevel": "anonymous",
+          "methods": [
+              "get"
+          ],
+          "type": "httpTrigger",
+          "direction": "in",
+          "name": "Request"
+      },
+      {
+          "type": "http",
+          "direction": "out",
+          "name": "Response"
+      }
+  ]
+}
+```
+
+Additionally, we will publish one more function, which returns a simple text, if the root of the function app is called. To do so, repeat the steps above to create a new function and provide the following code:
+
+1. run.ps1
+
+```PowerShell
+# Input bindings are passed in via param block.
+param($Request, $TriggerMetadata)
+
+# Write to the Azure Functions log stream.
+Write-Host "Trigger: Static website index has been requested."
+
+# Create HTML
+$staticWebsiteIndex = @"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MTA-STS</title>
+</head>
+<body>
+  <hl>MTA-STS Static Website Index</hl>
+  <p>Looking for the <a href="./.well-known/mta-sts.txt">mta-sts.txt</a>?</p>
+</body>
+</html>
+"@
+
+# Return the response
+try {
+    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        StatusCode = [System.Net.HttpStatusCode]::OK
+        Headers = @{
+            "content-type" = "text/html"
+        }
+        Body = $staticWebsiteIndex
+    })
+}
+catch {
+ # Return error, if something went wrong
+ Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        StatusCode = [System.Net.HttpStatusCode]::InternalServerError
+        Headers = @{
+            "Content-type" = "text/plain"
+        }
+        Body = $_.Exception.Message
+    })
+}
+```
+
+2. function.json
+
+```json
+{
+  "bindings": [
+      {
+          "route": "/",
+          "authLevel": "ANONYMOUS",
+          "methods": [
+              "get"
+          ],
+          "type": "httpTrigger",
+          "direction": "in",
+          "name": "Request"
+      },
+      {
+          "type": "http",
+          "direction": "out",
+          "name": "Response"
+      }
   ]
 }
 ```
@@ -328,7 +412,7 @@ This function will do the following by default for each domain in the CSV file:
 
 - Validate the TXT record
 - Add the custom domain to the Azure Function App
-- Create a Azure managed certificate for the custom domain. The display name of the certificate object in Azure will be "mtasts-cert-*your-custom-domain*"
+- Create a Azure managed certificate for the custom domain. The display name of the certificate object in Azure will be "mtasts-cert-\<your-custom-domain\>"
 - Bind the Azure managed certificate for the custom domain to the Function App with SNI SSL. SNI SSL is a newer protocol that allows multiple SSL certificates to share the same IP address. It is the most common way to secure a custom domain with a certificate. **(RECOMMENDED)**
 
 Simply run the function and edit the parameters as required:
@@ -390,7 +474,26 @@ CONGRATULATIONS! You have successfully configured MTA-STS for your domains.
 
 ## Conclusion
 
-You made a huge step towards a more secure email communication. Now, you can sit back and relax. Your MTA-STS policy will be published automatically. It is recommended to monitor your Azure Function App, so you can react quickly in case of an error. To learn how to create a alert rule for your function app check out the [PS.MTA-STS Alert rule recommendation](./configureAlertRule.md) or follow the instructions in the official Microsoft documentation [Create or edit an alert rule
+You made a huge step towards a more secure email communication. Now, you can sit back and relax. Your MTA-STS policy will be published automatically.
+
+### Monitoring and Reporting
+
+It is recommended to monitor your Azure Function App, so you can react quickly in case of an error. To learn how to create a alert rule for your function app check out the [PS.MTA-STS Alert rule recommendation](./configureAlertRule.md) or follow the instructions in the official Microsoft documentation [Create or edit an alert rule
 ](https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-create-new-alert-rule?tabs=metric)
+
+### TLS-RPT
+
+Additionally, we recommend to configure a [TLSRPT](https://tools.ietf.org/html/rfc8460) policy to receive reports about your MTA-STS policy. This will help you to identify issues and to improve your policy.
+
+Defined in [rfc8460](https://datatracker.ietf.org/doc/html/rfc8460)
+
+This DNS Record allows the Sender MTA to send Reports (similar to DMARC) to a defined Emailadress or a HTML Site for reporting purposes. While Microsoft does not offer a Service to aggregate these Reports, there are plenty of TLSRPT Data providers that can do this Job.
+
+``` Text
+_smtp._tls.example.com. IN TXT "v=TLSRPTv1;rua=mailto:reports@example.com"
+_smtp._tls.example.com. IN TXT "v=TLSRPTv1; rua=https://reporting.example.com/v1/tlsrpt"
+```
+
+### Feedback
 
 We are looking forward to your feedback. If you have any questions or suggestions, please feel free to open an issue in the [PS.MTA-STS GitHub repository](https://github.com/jklotzsche-msft/PS.MTA-STS/issues).
