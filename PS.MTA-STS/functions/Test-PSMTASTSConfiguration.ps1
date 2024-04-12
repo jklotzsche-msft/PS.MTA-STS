@@ -52,22 +52,17 @@
 
         Reads list of accepted domains from "C:\temp\accepted-domains.csv" and checks if MTA-STS is configured correctly for each domain in Function App "MTA-STS-FunctionApp". It also exports result to "C:\temp\mta-sts-result.csv".
     #>
-    [CmdletBinding(DefaultParameterSetName = "CsvWithExport")]
+    [CmdletBinding(DefaultParameterSetName = "Csv")]
     param(
-        [Parameter(Mandatory = $true, ParameterSetName = "CsvWithExport")]
-        [Parameter(Mandatory = $true, ParameterSetName = "CsvWithoutExport")]
+        [Parameter(Mandatory = $true, ParameterSetName = "Csv")]
         [string]
         $CsvPath,
 
-        [Parameter(Mandatory = $true, ParameterSetName = "ManualWithExport")]
-        [Parameter(Mandatory = $true, ParameterSetName = "ManualWithoutExport")]
+        [Parameter(Mandatory = $true, ParameterSetName = "DomainName")]
         [string[]]
         $DomainName,
 
-        [Parameter(Mandatory = $true, ParameterSetName = "CsvWithExport")]
-        [Parameter(Mandatory = $true, ParameterSetName = "CsvWithoutExport")]
-        [Parameter(Mandatory = $true, ParameterSetName = "ManualWithExport")]
-        [Parameter(Mandatory = $true, ParameterSetName = "ManualWithoutExport")]
+        [Parameter(Mandatory = $true)]
         [string]
         $FunctionAppName,
 
@@ -77,13 +72,9 @@
         [Bool]
         $DisplayResult = $true,
 
-        [Parameter(ParameterSetName = "CsvWithExport")]
-        [Parameter(ParameterSetName = "ManualWithExport")]
         [Switch]
         $ExportResult,
     
-        [Parameter(ParameterSetName = "CsvWithExport")]
-        [Parameter(ParameterSetName = "ManualWithExport")]
         [String]
         $ResultPath = (Join-Path -Path $env:TEMP -ChildPath "$(Get-Date -Format yyyyMMddhhmmss)_mta-sts-test-result.csv"),
 

@@ -97,7 +97,7 @@ In both cases, remember the valid characters for the Azure resources:
 
 - Resource Group Name
   - Length: 1-90
-  - Valid characters: lower- and uppercase letters, numbers, periods, and hyphens (a-z, A-Z, 0-9, ., and -)
+  - Valid characters: lower- and uppercase letters, numbers, periods, hyphens and underscores (a-z, A-Z, 0-9, ., -, _)
 - Function App Name
   - Length: 2-60
   - Valid characters: lower- and uppercase letters, numbers and hyphens (a-z, A-Z, 0-9, and -)

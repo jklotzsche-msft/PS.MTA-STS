@@ -8,9 +8,16 @@ To update the module to the latest version, use the following command:
 Update-Module -Name PS.MTA-STS
 ```
 
+## Version 1.2.1
+
+The 1.2.1 release of the PS.MTA-STS module includes the following changes and improvements:
+
+- Added underscore as a valid character for resource group names in "New-PSMTASTSFunctionAppDeployment"
+- Fixed bug in "Test-PSMTASTSConfiguration" when using the "-DomainName" parameter
+
 ## Version 1.2.0
 
-The 1.2.0 release of the PS.MTA-STS module includes the following changes and improvements:
+The 1.2.0 release of the PS.MTA-STS module includes (but is not limited to) the following changes and improvements:
 
 - Added 'Update-PSMTASTSFunctionAppFile' function to update the function app files
 - Added tests for TLS-RPT to "Export-PSMTASTSDomainsFromExo" and "Test-PSMTASTSConfiguration" --> Thanks to [BohrenAn](https://github.com/BohrenAn)
