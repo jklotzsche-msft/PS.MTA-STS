@@ -13,17 +13,20 @@
     .PARAMETER Location
         Provide the Azure location, where the Azure Function App should be created.
         You can get a list of all available locations by running 'Get-AzLocation | Select-Object -ExpandProperty location | Sort-Object'
-    
+
     .PARAMETER ResourceGroupName
         Provide the name of the Azure resource group, where the Azure Function App should be created.
         If the resource group doesn't exist, it will be created.
         If the resource group exists already, it will be used.
-    
+
     .PARAMETER FunctionAppName
         Provide the name of the Azure Function App, which should be created.
         If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
         If the Azure Function App exists, it will be updated with the latest PowerShell code. This will overwrite any changes you made to the Azure Function App!
-        
+
+    .PARAMETER RegisterResourceProvider
+        Use this Parameter to Register Resource Provider 'Microsoft.Web' if it is not yet registered
+
     .PARAMETER StorageAccountName
         Provide the name of the Azure Storage Account, which should be created.
         If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
@@ -99,7 +102,10 @@
         $PolicyMode = "Enforce",
 
         [String]
-        $DnsServer = "8.8.8.8"
+        $DnsServer = "8.8.8.8",
+
+        #Register AZ Resource Provider
+        [Parameter(Mandatory = $false)][switch]$RegisterResourceProvider
     )
     #endregion Parameter
 
@@ -140,10 +146,32 @@
         # Set default resource group for future cmdlets in this powershell session
         $null = Set-AzDefault -ResourceGroupName $ResourceGroupName
 
+        # Check Resource Provider
+        $ResourceProvider = Get-AzResourceProvider
+        $MicrosoftWeb = $ResourceProvider | Where-Object {$_.ProviderNamespace -eq "Microsoft.Web"}
+        If ($Null -eq $MicrosoftWeb)
+        {
+            #Resource Provicer Microsoft.Web not registered
+            If ($RegisterResourceProvider -eq $true)
+            {
+                Register-AzResourceProvider -ProviderNamespace Microsoft.Web
+            } else {
+                throw "Azure Resource Provider 'Microsoft.Web' is not registered. Use the -RegisterResourceProvider Parameter to register the Resource Provider."
+            }
+        }
+
         # Check if Storage StorageAccountName already exists
         $storageAccountDnsResult = Resolve-PSMTASTSDnsName -Name "$StorageAccountName.blob.core.windows.net" -Type A -Server $DnsServer -ErrorAction Stop
         if ($null -ne $storageAccountDnsResult) {
-            throw "Storage Account already exists. Please provide a different name for the Storage Account."
+            $StorageAccounts = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName
+            If ($StorageAccounts.StorageAccountName -match $StorageAccountName)
+            {
+                Write-Verbose "Existing Storage Account found in Resource Group"
+                [bool]$ExistingStorageAccount = $true
+            } else {
+                throw "Storage Account already exists. Please provide a different name for the Storage Account."
+            }
+            
         }
 
         # Check, if FunctionApp exists already
@@ -152,18 +180,21 @@
             throw "Function App already exists. Please provide a different name for the Function Account."
         }
 
-        # Create Storage Account
-        Write-Verbose "Creating Azure Storage Account $StorageAccountName..."
-        $newAzStorageAccountProps = @{
-            ResourceGroupName     = $ResourceGroupName
-            Name                  = $StorageAccountName
-            Location              = $Location
-            SkuName               = 'Standard_LRS'
-            AllowBlobPublicAccess = $false
-            ErrorAction           = 'Stop'
-        }
-        if ($PSCmdlet.ShouldProcess("Storage Account $StorageAccountName", "Create")) {
-            $null = New-AzStorageAccount @newAzStorageAccountProps
+        If ($ExistingStorageAccount -ne $true) {
+            # Create Storage Account
+            Write-Verbose "Creating Azure Storage Account $StorageAccountName..."
+            $newAzStorageAccountProps = @{
+                ResourceGroupName     = $ResourceGroupName
+                Name                  = $StorageAccountName
+                Location              = $Location
+                SkuName               = 'Standard_LRS'
+                AllowBlobPublicAccess = $false
+                EnableHttpsTrafficOnly = $true
+                ErrorAction           = 'Stop'
+            }
+            if ($PSCmdlet.ShouldProcess("Storage Account $StorageAccountName", "Create")) {
+                $null = New-AzStorageAccount @newAzStorageAccountProps
+            }
         }
 
         # Create Function App
@@ -186,6 +217,13 @@
         # Wait for Function App to be ready
         Write-Verbose "Waiting for Azure Function App $FunctionAppName to be ready..."
         $null = Start-Sleep -Seconds 60
+
+        # Remove AzureWebJobsDashboard
+        $FunctionAppSettings = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName
+        If ("AzureWebJobsDashboard" -match $FunctionAppSettings.Name){
+            Write-Verbose "Remove AzureWebJobsDashboard"
+            Remove-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -AppSettingName "AzureWebJobsDashboard" -Confirm:$false -Force
+        }
 
         # Update the Azure Function App files with the latest PowerShell code
         $updateFunctionAppProps = @{
