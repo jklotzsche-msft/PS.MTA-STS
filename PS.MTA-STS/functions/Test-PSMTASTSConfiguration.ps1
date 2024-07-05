@@ -136,8 +136,14 @@ max_age: 604800
         $counter = 1
 
         # Loop through all domains
+		$domainListCount = $domainList.Count
         foreach ($domain in $domainList) {
             Write-Verbose "Checking $counter / $($domainList.count) - $($domain)"
+
+            #Progress Bar
+            [int]$Percent = 100 / $AcceptedDomainsCount * $counter
+            Write-Progress -Activity "Test in Progress" -Status "$Percent% Complete:" -PercentComplete $Percent
+
             # Prepare result object
             $resultObject = [PSCustomObject]@{
                 DomainName            = $domain
@@ -155,7 +161,7 @@ max_age: 604800
             # Checking MTA-STS TXT Record
             # Example: _mta-sts.example.com. IN TXT "v=STSv1; id=20160831085700Z"
             $mtaStsDNSHost = "_mta-sts." + $domain
-            $mtaStsTXTRecord = Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer -ErrorAction Stop | Where-Object { $_.Strings -match "v=STSv1" }
+            $mtaStsTXTRecord = Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -match "v=STSv1" }
 
             if ($mtaStsTXTRecord -and ($mtaStsTXTRecord.strings -like $txtRecordContent)) {
                 $resultObject.MTA_STS_TXTRecord = "OK"
@@ -171,7 +177,7 @@ max_age: 604800
 
             # Check MTA-STS CNAME record
             $mtaStsName = "mta-sts." + $domain
-            $cnameRecord = Resolve-PSMTASTSDnsName -Name $mtaStsName -Type CNAME -Server $DnsServer -ErrorAction Stop
+            $cnameRecord = Resolve-PSMTASTSDnsName -Name $mtaStsName -Type CNAME -Server $DnsServer -ErrorAction SilentlyContinue
 
             if ($cnameRecord -and ($resultObject.Host -eq $cnameRecord.NameHost)) {
                 $resultObject.MTA_STS_CNAME = "OK"
@@ -216,7 +222,7 @@ max_age: 604800
             # Checking TLSRPT Record
             # Example: _smtp._tls.example.com. IN TXT "v=TLSRPTv1;rua=mailto:reports@example.com"
             $tlsRptDNSHost = "_smtp._tls." + $domain
-            $tlsRptRecord = Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction Stop | Where-Object -FilterScript {$_.Strings -like "v=TLSRPTv1*"}
+            $tlsRptRecord = Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object -FilterScript {$_.Strings -like "v=TLSRPTv1*"}
 
             if ($null -ne $tlsRptRecord) {
                 $resultObject.TLSRPT = $tlsRptRecord.Strings[0]
@@ -224,7 +230,7 @@ max_age: 604800
 
             # Checking MX Record
             # Example: example.com. IN MX 0 example-com.mail.protection.outlook.com.
-            $mxRecord = Resolve-PSMTASTSDnsName -Name $domain -Type MX -Server $DnsServer -ErrorAction Stop
+            $mxRecord = Resolve-PSMTASTSDnsName -Name $domain -Type MX -Server $DnsServer -ErrorAction SilentlyContinue
 
             $resultObject.MX_Record_Pointing_To = $mxRecord.NameExchange -join ", "
 
