@@ -141,7 +141,7 @@ max_age: 604800
             Write-Verbose "Checking $counter / $($domainList.count) - $($domain)"
 
             #Progress Bar
-            [int]$Percent = 100 / $AcceptedDomainsCount * $counter
+            [int]$Percent = 100 / $domainListCount * $counter
             Write-Progress -Activity "Test in Progress" -Status "$Percent% Complete:" -PercentComplete $Percent
 
             # Prepare result object

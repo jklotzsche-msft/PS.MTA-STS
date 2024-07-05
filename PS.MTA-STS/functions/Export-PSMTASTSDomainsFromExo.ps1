@@ -78,7 +78,8 @@
         $ExoHost = "*.mail.protection.outlook.com",
 
         #Skip DNS Tests
-        [Parameter(Mandatory = $false)][switch]$SkipDNSTests
+        [switch]
+        $SkipDNSTests
     )
     
     begin {
@@ -104,7 +105,7 @@
         }
 
         # Get either full list of accepted domains or the provided list of accepted domains
-        if($null -eq $DomainName) {
+        if ($null -eq $DomainName) {
             Write-Verbose "Getting all domains from Exchange Online and checking MX-Record. Please wait..."
             $acceptedDomains = Get-AcceptedDomain -ResultSize unlimited -ErrorAction Stop
         }
@@ -134,88 +135,93 @@
                 TLSRPT                = ""                          # TLSRPT Record, if available
             }
 
-            If ($SkipDNSTests -eq $false)
-            {
-                # Checking MTA-STS TXT Record
-                # Example: _mta-sts.example.com. IN TXT "v=STSv1; id=20160831085700Z"
-                $mtaStsDNSHost = "_mta-sts." + $acceptedDomain.DomainName
-                $mtaStsTXTRecord = Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer -ErrorAction Stop | Where-Object {$_.Strings -match "v=STSv1"}
+            if ($SkipDNSTests -eq $true) {
+                # skip DNS checks
+                Write-Verbose -Message "Skipping DNS checks"
 
-                if ($null -ne $mtaStsTXTRecord) {
-                    $resultObject.MTA_STS_TXTRecord = $mtaStsTXTRecord.strings -join " | " # Strings are joined, because multiple strings can be returned
-                }
+                # Add the result to the result array
+                Write-Verbose "...adding result to result array."
+                $result += $resultObject
 
-                # Checking MTA-STS Policy
-                <# Example:
+                # Increase the counter for verbose output
+                $counter++
+
+                # Continue with the next domain
+                continue
+            }
+
+            # Checking MTA-STS TXT Record
+            # Example: _mta-sts.example.com. IN TXT "v=STSv1; id=20160831085700Z"
+            $mtaStsDNSHost = "_mta-sts." + $acceptedDomain.DomainName
+            $mtaStsTXTRecord = Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer -ErrorAction Stop | Where-Object { $_.Strings -match "v=STSv1" }
+
+            if ($null -ne $mtaStsTXTRecord) {
+                $resultObject.MTA_STS_TXTRecord = $mtaStsTXTRecord.strings -join " | " # Strings are joined, because multiple strings can be returned
+            }
+
+            # Checking MTA-STS Policy
+            <# Example:
                     version: STSv1
                     mode: enforce
                     mx: *.mail.protection.outlook.com
                     max_age: 604800
                 #>
-                $mtaStsUri = "https://mta-sts.{0}/.well-known/mta-sts.txt" -f $acceptedDomain.DomainName
-                Write-Verbose "...checking MTA-STS Policy file at $mtaStsUri"
-                try {
-                    # Try to get the MTA-STS Policy file
-                    $mtaStsPolicyResponse = Invoke-WebRequest -URI $mtaStsUri -TimeoutSec 20 -ErrorAction SilentlyContinue
-                    $resultObject.MTA_STS_Policy = ($mtaStsPolicyResponse.Content).Trim() #.Replace("`r`n","")
-                }
-                catch {
-                    # If the MTA-STS Policy file is not available or other issues occur, the result will be set to "ERROR: $($_.Exception.InnerException.Message)"
-                    $resultObject.MTA_STS_Policy = "ERROR: $($_.Exception.InnerException.Message)"
-                }
-
-                # Checking TLSRPT Record
-                # Example: _smtp._tls.example.com. IN TXT "v=TLSRPTv1;rua=mailto:reports@example.com"
-                $tlsRptDNSHost = "_smtp._tls." + $acceptedDomain.DomainName
-                $tlsRptRecord = Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object {$_.Strings -like "v=TLSRPTv1*"}
-
-                if ($null -ne $tlsRptRecord) {
-                    $resultObject.TLSRPT = $tlsRptRecord.Strings[0]
-                }
-
-                # Checking MX Record
-                # Example: example.com. IN MX 0 example-com.mail.protection.outlook.com.
-                $mxRecord = Resolve-PSMTASTSDnsName -Name $acceptedDomain.DomainName -Type MX -Server $DnsServer -ErrorAction SilentlyContinue
-
-                $resultObject.MTA_STS_CanBeUsed = "No" # Default value
-                # Check if the domain is an onmicrosoft.com domain
-                if ($acceptedDomain.DomainName -like "*.onmicrosoft.com") {
-                    $resultObject.MX_Record_Pointing_To = "WARNING: You cannot configure MTA-STS for an onmicrosoft.com domain."
-                }
-                # Check if the MX record points to Exchange Online
-                elseif (($mxRecord.NameExchange.count -eq 1) -and ($mxRecord.NameExchange -like $ExoHost)) {
-                    $resultObject.MX_Record_Pointing_To = $mxRecord.NameExchange
-                    # Check if MTA-STS can be used (TXT record and Policy file are configured)
-                    if (("" -eq $resultObject.MTA_STS_TXTRecord) -and ("" -eq $resultObject.MTA_STS_Policy)) {
-                        $resultObject.MTA_STS_CanBeUsed = "Yes"
-                    }
-                    elseif (("" -ne $resultObject.MTA_STS_TXTRecord) -and ($resultObject.MTA_STS_Policy -like "ERROR: *" -or "" -eq $resultObject.MTA_STS_Policy)) {
-                        $resultObject.MTA_STS_CanBeUsed = "WARNING: MTA-STS TXT record is configured, but MTA-STS Policy file is not available."
-                    }
-                    elseif (("" -eq $resultObject.MTA_STS_TXTRecord) -and ("" -ne $resultObject.MTA_STS_Policy)) {
-                        $resultObject.MTA_STS_CanBeUsed = "INFORMATION: MTA-STS TXT record is not configured, but MTA-STS Policy file is configured."
-                    }
-                    else {
-                        $resultObject.MTA_STS_CanBeUsed = "COMPLETED: MTA-STS TXT record and MTA-STS Policy file are configured. Please double-check the content of the MTA-STS Policy file."
-                    }
-                }
-                # Check if the MX record points to another host than Exchange Online or if multiple MX records were found
-                elseif (($mxRecord.NameExchange.count -gt 1) -or ($mxRecord.NameExchange -notlike $ExoHost)) {
-                    $resultObject.MX_Record_Pointing_To = "WARNING: MX Record does not point to Exchange Online (only). The following host(s) was/were found: $($mxRecord.NameExchange -join ", ")"
-                }
-                # Assume, that no MX record was found
-                else {
-                    $resultObject.MX_Record_Pointing_To = "ERROR: No MX record found. Please assure, that the MX record for $($acceptedDomain.DomainName) points to Exchange Online."
-                }
-            } else {
-                #Skipped DNS > Create Empty Records
-                $resultObject.MX_Record_Pointing_To = ""
-                $resultObject.MTA_STS_TXTRecord = ""
-                $resultObject.MTA_STS_Policy = ""
-                $resultObject.MTA_STS_CanBeUsed = ""
-                $resultObject.TLSRPT = ""
+            $mtaStsUri = "https://mta-sts.{0}/.well-known/mta-sts.txt" -f $acceptedDomain.DomainName
+            Write-Verbose "...checking MTA-STS Policy file at $mtaStsUri"
+            try {
+                # Try to get the MTA-STS Policy file
+                $mtaStsPolicyResponse = Invoke-WebRequest -Uri $mtaStsUri -TimeoutSec 20 -ErrorAction SilentlyContinue
+                $resultObject.MTA_STS_Policy = ($mtaStsPolicyResponse.Content).Trim() #.Replace("`r`n","")
             }
-        
+            catch {
+                # If the MTA-STS Policy file is not available or other issues occur, the result will be set to "ERROR: $($_.Exception.InnerException.Message)"
+                $resultObject.MTA_STS_Policy = "ERROR: $($_.Exception.InnerException.Message)"
+            }
+
+            # Checking TLSRPT Record
+            # Example: _smtp._tls.example.com. IN TXT "v=TLSRPTv1;rua=mailto:reports@example.com"
+            $tlsRptDNSHost = "_smtp._tls." + $acceptedDomain.DomainName
+            $tlsRptRecord = Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -like "v=TLSRPTv1*" }
+
+            if ($null -ne $tlsRptRecord) {
+                $resultObject.TLSRPT = $tlsRptRecord.Strings[0]
+            }
+
+            # Checking MX Record
+            # Example: example.com. IN MX 0 example-com.mail.protection.outlook.com.
+            $mxRecord = Resolve-PSMTASTSDnsName -Name $acceptedDomain.DomainName -Type MX -Server $DnsServer -ErrorAction SilentlyContinue
+
+            $resultObject.MTA_STS_CanBeUsed = "No" # Default value
+            # Check if the domain is an onmicrosoft.com domain
+            if ($acceptedDomain.DomainName -like "*.onmicrosoft.com") {
+                $resultObject.MX_Record_Pointing_To = "WARNING: You cannot configure MTA-STS for an onmicrosoft.com domain."
+            }
+            # Check if the MX record points to Exchange Online
+            elseif (($mxRecord.NameExchange.count -eq 1) -and ($mxRecord.NameExchange -like $ExoHost)) {
+                $resultObject.MX_Record_Pointing_To = $mxRecord.NameExchange
+                # Check if MTA-STS can be used (TXT record and Policy file are configured)
+                if (("" -eq $resultObject.MTA_STS_TXTRecord) -and ("" -eq $resultObject.MTA_STS_Policy)) {
+                    $resultObject.MTA_STS_CanBeUsed = "Yes"
+                }
+                elseif (("" -ne $resultObject.MTA_STS_TXTRecord) -and ($resultObject.MTA_STS_Policy -like "ERROR: *" -or "" -eq $resultObject.MTA_STS_Policy)) {
+                    $resultObject.MTA_STS_CanBeUsed = "WARNING: MTA-STS TXT record is configured, but MTA-STS Policy file is not available."
+                }
+                elseif (("" -eq $resultObject.MTA_STS_TXTRecord) -and ("" -ne $resultObject.MTA_STS_Policy)) {
+                    $resultObject.MTA_STS_CanBeUsed = "INFORMATION: MTA-STS TXT record is not configured, but MTA-STS Policy file is configured."
+                }
+                else {
+                    $resultObject.MTA_STS_CanBeUsed = "COMPLETED: MTA-STS TXT record and MTA-STS Policy file are configured. Please double-check the content of the MTA-STS Policy file."
+                }
+            }
+            # Check if the MX record points to another host than Exchange Online or if multiple MX records were found
+            elseif (($mxRecord.NameExchange.count -gt 1) -or ($mxRecord.NameExchange -notlike $ExoHost)) {
+                $resultObject.MX_Record_Pointing_To = "WARNING: MX Record does not point to Exchange Online (only). The following host(s) was/were found: $($mxRecord.NameExchange -join ", ")"
+            }
+            # Assume, that no MX record was found
+            else {
+                $resultObject.MX_Record_Pointing_To = "ERROR: No MX record found. Please assure, that the MX record for $($acceptedDomain.DomainName) points to Exchange Online."
+            }
+
             # Add the result to the result array
             Write-Verbose "...adding result to result array."
             $result += $resultObject
@@ -228,7 +234,7 @@
     end {
         # Output the result in a new PowerShell window
         $domainsToExport = $result
-        if($DisplayResult) {
+        if ($DisplayResult) {
             Write-Warning "Please select/highlight the domains you want to configure MTA-STS for in the new PowerShell window and click OK. You can select multiple entries by holding the CTRL key OR by selecting your first entry, then holding the SHIFT key and selecting your last entry."
             $domainsToExport = $result | Sort-Object -Property MTA_STS_CanBeUsed, Name | Out-GridView -Title "Please select the domains you want to configure MTA-STS for and click OK." -PassThru
         }

@@ -35,16 +35,16 @@
         $Server
     )
 
-    Write-Verbose "...checking $Type record for $Name using DNS server $Server"
+    Write-Verbose -Message "...checking $($Type.ToUpper()) record for $Name using DNS server $Server"
     try {
         Resolve-DnsName -Name $Name -Type $Type -Server $Server -QuickTimeout -ErrorAction Stop
     }
     catch {
-        if($_.Exception.Message -like "*DNS name does not exist*") {
-            Write-Verbose "DNS record not found. Continuing..."
+        if($_.CategoryInfo.Category -eq "ResourceUnavailable") {
+            Write-Verbose -Message "DNS record not found. Continuing..."
         }
-        elseif($_.Exception.Message -like "*timeout period expired*") {
-            throw "ERROR: Timeout period expired. Please check the DNS server and try again. Are you able to resolve the DNS record using the defined DNS server?"
+        elseif($_.CategoryInfo.Category -eq "OperationTimeout") {
+            throw "ERROR: Timeout period expired. Please check the DNS server and try again. Are you able to resolve the DNS record using the specified DNS server?"
         }
         else {
             throw $_
