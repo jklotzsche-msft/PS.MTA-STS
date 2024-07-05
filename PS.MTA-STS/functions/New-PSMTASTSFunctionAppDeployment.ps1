@@ -31,6 +31,10 @@
         Provide the name of the Azure Storage Account, which should be created.
         If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
 
+    .PARAMETER PlanName
+        Provide the name of the Azure App Service Plan, which should be created.
+        If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
+
     .PARAMETER PolicyMode
         Specifies if the policy is in "Enforce" mode or "Testing" mode
 
@@ -57,6 +61,7 @@
     #region Parameter
     [CmdletBinding(SupportsShouldProcess = $true)]
     Param (
+        #TODO: Location and PlanName cannot be set at the same time. Add them to different parametersets
         [Parameter(Mandatory = $true)]
         [String]
         $Location,
@@ -75,8 +80,8 @@
 
         [Parameter(Mandatory = $true)]
         [ValidateScript({
-                if ($_.length -lt 2 -or $_.length -gt 60 -or $_ -notmatch "^[a-z0-9-]*$") {
-                    throw "Function App name '$_' is not valid. The name must be between 2 and 60 characters long and can contain only lowercase letters, numbers and hyphens."
+                if ($_.length -lt 2 -or $_.length -gt 60 -or $_ -notmatch "^[a-zA-Z0-9-]*$") {
+                    throw "Function App name '$_' is not valid. The name must be between 2 and 60 characters long and can contain only letters, numbers and hyphens."
                 }
                 else {
                     $true
@@ -96,6 +101,10 @@
             })]
         [String]
         $StorageAccountName,
+
+        #TODO: Location and PlanName cannot be set at the same time. Add them to different parametersets
+        [String]
+        $PlanName,
 
         [ValidateSet("Enforce", "Testing", "None")] # ValidateSet is used to limit the possible values
         [String]
@@ -145,6 +154,14 @@
 
         # Set default resource group for future cmdlets in this powershell session
         $null = Set-AzDefault -ResourceGroupName $ResourceGroupName
+
+        # Check, if PlanName is valid, if provided
+        if($PlanName) {
+            $appServicePlanResult = Get-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $PlanName -ErrorAction SilentlyContinue
+            if ($null -eq $appServicePlanResult) {
+                throw "App Service Plan '$PlanName' does not exist in Resource Group '$ResourceGroupName'. Please provide a valid App Service Plan."
+            }
+        }
 
         # Check Resource Provider
         $ResourceProvider = Get-AzResourceProvider
@@ -202,13 +219,20 @@
         $newAzFunctionAppProps = @{
             ResourceGroupName  = $ResourceGroupName
             Name               = $FunctionAppName
-            Location           = $Location
             Runtime            = 'PowerShell'
             StorageAccountName = $StorageAccountName
             FunctionsVersion   = '4'
             OSType             = 'Windows'
             RuntimeVersion     = '7.2'
             ErrorAction        = 'Stop'
+        }
+        if($PlanName) {
+            # Add App Service Plan, if provided
+            $newAzFunctionAppProps.PlanName = $PlanName
+        }
+        else {
+            #TODO: Location and PlanName cannot be set at the same time. This is a workaround until the bug is fixed.
+            $newAzFunctionAppProps.Location = $Location
         }
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Create")) {
             $null = New-AzFunctionApp @newAzFunctionAppProps
