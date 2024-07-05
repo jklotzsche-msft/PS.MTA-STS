@@ -14,6 +14,9 @@
         Provide the Azure location, where the Azure Function App should be created.
         You can get a list of all available locations by running 'Get-AzLocation | Select-Object -ExpandProperty location | Sort-Object'
 
+        If the PlanName is provided, the location will be set to the location of the App Service Plan.
+        The location will still be used to create the resource group.
+
     .PARAMETER ResourceGroupName
         Provide the name of the Azure resource group, where the Azure Function App should be created.
         If the resource group doesn't exist, it will be created.
@@ -34,6 +37,9 @@
     .PARAMETER PlanName
         Provide the name of the Azure App Service Plan, which should be created.
         If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
+
+        If the PlanName is provided, the location will be set to the location of the App Service Plan.
+        The location will still be used to create the resource group.
 
     .PARAMETER PolicyMode
         Specifies if the policy is in "Enforce" mode or "Testing" mode
@@ -61,7 +67,6 @@
     #region Parameter
     [CmdletBinding(SupportsShouldProcess = $true)]
     Param (
-        #TODO: Location and PlanName cannot be set at the same time. Add them to different parametersets
         [Parameter(Mandatory = $true)]
         [String]
         $Location,
@@ -102,7 +107,6 @@
         [String]
         $StorageAccountName,
 
-        #TODO: Location and PlanName cannot be set at the same time. Add them to different parametersets
         [String]
         $PlanName,
 
@@ -114,7 +118,8 @@
         $DnsServer = "8.8.8.8",
 
         #Register AZ Resource Provider
-        [Parameter(Mandatory = $false)][switch]$RegisterResourceProvider
+        [Switch]
+        $RegisterResourceProvider
     )
     #endregion Parameter
 
@@ -156,7 +161,7 @@
         $null = Set-AzDefault -ResourceGroupName $ResourceGroupName
 
         # Check, if PlanName is valid, if provided
-        if($PlanName) {
+        if ($PlanName) {
             $appServicePlanResult = Get-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $PlanName -ErrorAction SilentlyContinue
             if ($null -eq $appServicePlanResult) {
                 throw "App Service Plan '$PlanName' does not exist in Resource Group '$ResourceGroupName'. Please provide a valid App Service Plan."
@@ -165,15 +170,14 @@
 
         # Check Resource Provider
         $ResourceProvider = Get-AzResourceProvider
-        $MicrosoftWeb = $ResourceProvider | Where-Object {$_.ProviderNamespace -eq "Microsoft.Web"}
-        If ($Null -eq $MicrosoftWeb)
-        {
+        $MicrosoftWeb = $ResourceProvider | Where-Object { $_.ProviderNamespace -eq "Microsoft.Web" }
+        if ($Null -eq $MicrosoftWeb) {
             #Resource Provicer Microsoft.Web not registered
-            If ($RegisterResourceProvider -eq $true)
-            {
+            if ($RegisterResourceProvider -eq $true) {
                 Register-AzResourceProvider -ProviderNamespace Microsoft.Web
-            } else {
-                throw "Azure Resource Provider 'Microsoft.Web' is not registered. Use the -RegisterResourceProvider Parameter to register the Resource Provider."
+            }
+            else {
+                Write-Warning -Message "Azure Resource Provider 'Microsoft.Web' is not registered. Use the -RegisterResourceProvider Parameter to register the Resource Provider."
             }
         }
 
@@ -181,14 +185,20 @@
         $storageAccountDnsResult = Resolve-PSMTASTSDnsName -Name "$StorageAccountName.blob.core.windows.net" -Type A -Server $DnsServer -ErrorAction Stop
         if ($null -ne $storageAccountDnsResult) {
             $StorageAccounts = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName
-            If ($StorageAccounts.StorageAccountName -match $StorageAccountName)
-            {
-                Write-Verbose "Existing Storage Account found in Resource Group"
+
+            # Check, if Storage Account exists already
+            if (($StorageAccounts.StorageAccountName.count -eq 1 -and $StorageAccounts.StorageAccountName -eq $StorageAccountName) -or ($StorageAccounts.StorageAccountName.count -gt 1 -and $StorageAccounts.StorageAccountName -contains $StorageAccountName)) {
+                # Single Storage Account found
+                Write-Verbose -Message "Existing Storage Account found in Resource Group"
                 [bool]$ExistingStorageAccount = $true
-            } else {
-                throw "Storage Account already exists. Please provide a different name for the Storage Account."
             }
-            
+            else {
+                throw "Storage Account exists somewhere else. Please provide a different name for the Storage Account."
+            }
+        }
+        else {
+            Write-Verbose -Message "Storage Account does not exist. Will be created."
+            [bool]$ExistingStorageAccount = $false
         }
 
         # Check, if FunctionApp exists already
@@ -197,17 +207,17 @@
             throw "Function App already exists. Please provide a different name for the Function Account."
         }
 
-        If ($ExistingStorageAccount -ne $true) {
+        if ($ExistingStorageAccount -ne $true) {
             # Create Storage Account
             Write-Verbose "Creating Azure Storage Account $StorageAccountName..."
             $newAzStorageAccountProps = @{
-                ResourceGroupName     = $ResourceGroupName
-                Name                  = $StorageAccountName
-                Location              = $Location
-                SkuName               = 'Standard_LRS'
-                AllowBlobPublicAccess = $false
+                ResourceGroupName      = $ResourceGroupName
+                Name                   = $StorageAccountName
+                Location               = $Location
+                SkuName                = 'Standard_LRS'
+                AllowBlobPublicAccess  = $false
                 EnableHttpsTrafficOnly = $true
-                ErrorAction           = 'Stop'
+                ErrorAction            = 'Stop'
             }
             if ($PSCmdlet.ShouldProcess("Storage Account $StorageAccountName", "Create")) {
                 $null = New-AzStorageAccount @newAzStorageAccountProps
@@ -226,14 +236,16 @@
             RuntimeVersion     = '7.2'
             ErrorAction        = 'Stop'
         }
-        if($PlanName) {
+        # If PlanName is provided, you cannot set the Location anymore.
+        # Therefore, we set the PlanName and don't set the Location, if PlanName is provided.
+        if ($PlanName) {
             # Add App Service Plan, if provided
             $newAzFunctionAppProps.PlanName = $PlanName
         }
         else {
-            #TODO: Location and PlanName cannot be set at the same time. This is a workaround until the bug is fixed.
             $newAzFunctionAppProps.Location = $Location
         }
+        # Create Function App
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Create")) {
             $null = New-AzFunctionApp @newAzFunctionAppProps
         }
@@ -242,11 +254,14 @@
         Write-Verbose "Waiting for Azure Function App $FunctionAppName to be ready..."
         $null = Start-Sleep -Seconds 60
 
-        # Remove AzureWebJobsDashboard
+        # Remove AzureWebJobsDashboard, as it is deprecated
+        $functionAppSettingsToRemove = @("AzureWebJobsDashboard")
         $FunctionAppSettings = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName
-        If ("AzureWebJobsDashboard" -match $FunctionAppSettings.Name){
-            Write-Verbose "Remove AzureWebJobsDashboard"
-            Remove-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -AppSettingName "AzureWebJobsDashboard" -Confirm:$false -Force
+        foreach($functionAppSettingToRemove in $functionAppSettingsToRemove) {
+            if ($FunctionAppSettings.Keys -contains $functionAppSettingToRemove) {
+                Write-Verbose "Remove $functionAppSettingToRemove App Setting from Function App $FunctionAppName..."
+                Remove-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -AppSettingName $functionAppSettingToRemove -Confirm:$false -Force
+            }
         }
 
         # Update the Azure Function App files with the latest PowerShell code

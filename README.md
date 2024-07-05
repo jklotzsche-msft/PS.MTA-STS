@@ -16,6 +16,8 @@ This module is for you, if you ...
 
 MTA-STS is a new internet standard that improves email security and delivery for your organization. MTA-STS leverages the well-known security standard HTTPS, which is used to secure connections to websites, to enable organizations to assert policies and requirements for their email services. MTA-STS also enables organizations to request that remote email servers deliver email messages over a secure connection and to report back on any failures encountered. This helps to ensure that email messages are delivered in a secure and reliable manner.
 
+> Please check out our [MTA-STS Infographic](./docs/mta-sts-infographic.md) to learn more about how MTA-STS works. We visualized the usual mail flow without MTA-STS, the possible attack scenario without MTA-STS, the usual mail flow with MTA-STS, and the possible attack scenario with MTA-STS, which can be detected and mitigated.
+
 ## SMTP MTA Strict Transport Security (MTA-STS)
 
 Defined in [rfc8461](https://datatracker.ietf.org/doc/html/rfc8461)
@@ -118,6 +120,10 @@ If you want to migrate or rebuild your MTA-STS deployment, check out our [Migrat
 ## Release Notes
 
 For more information about the latest changes, please check out the [release notes](./docs/releaseNotes.md).
+
+## Frequently Asked Questions (FAQ)
+
+For more information about frequently asked questions, please check out the [FAQ](./docs/faq.md).
 
 ## Resources / Links
 

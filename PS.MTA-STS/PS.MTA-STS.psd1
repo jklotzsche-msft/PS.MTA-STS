@@ -4,7 +4,7 @@
 RootModule = 'PS.MTA-STS.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.2.1'
+ModuleVersion = '1.2.2'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -108,10 +108,10 @@ PrivateData = @{
         # Tags = @()
 
         # A URL to the license for this module.
-        # LicenseUri = ''
+        LicenseUri = 'https://github.com/jklotzsche-msft/PS.MTA-STS/blob/main/LICENSE'
 
         # A URL to the main website for this project.
-        # ProjectUri = ''
+        ProjectUri = 'https://github.com/jklotzsche-msft/PS.MTA-STS'
 
         # A URL to an icon representing this module.
         IconUri = 'https://raw.githubusercontent.com/jklotzsche-msft/PS.MTA-STS/d7de833919d9bc5e1d7eccc218dbce8e57a03467/docs/_images/PS.MTA-STS-Logo.jpg'
