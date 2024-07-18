@@ -8,7 +8,7 @@ Mail Transfer Agent Strict Transport Security (MTA-STS) is a standard that allow
 
 MTA-STS is a new internet standard that improves email security and delivery for your organization. MTA-STS leverages the well-known security standard HTTPS, which is used to secure connections to websites, to enable organizations to assert policies and requirements for their email services. MTA-STS also enables organizations to request that remote email servers deliver email messages over a secure connection and to report back on any failures encountered. This helps to ensure that email messages are delivered in a secure and reliable manner.
 
-To learn more check out our visualized [MTA-STS Infographic](./docs/mta-sts-infographic.md).
+To learn more check out our visualized [MTA-STS Infographic](./mta-sts-infographic.md).
 
 ## How do I deploy MTA-STS for my domain?
 
