@@ -162,6 +162,7 @@ $mtaStsPolicy = @"
 version: STSv1
 mode: enforce
 mx: *.mail.protection.outlook.com
+mx: *.mx.microsoft
 max_age: 604800
 "@
 
