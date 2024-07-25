@@ -227,14 +227,15 @@
         # Create Function App
         Write-Verbose "Creating Azure Function App $FunctionAppName..."
         $newAzFunctionAppProps = @{
-            ResourceGroupName  = $ResourceGroupName
-            Name               = $FunctionAppName
-            Runtime            = 'PowerShell'
-            StorageAccountName = $StorageAccountName
-            FunctionsVersion   = '4'
-            OSType             = 'Windows'
-            RuntimeVersion     = '7.2'
-            ErrorAction        = 'Stop'
+            ResourceGroupName          = $ResourceGroupName
+            Name                       = $FunctionAppName
+            Runtime                    = 'PowerShell'
+            StorageAccountName         = $StorageAccountName
+            FunctionsVersion           = '4'
+            OSType                     = 'Windows'
+            RuntimeVersion             = '7.2'
+            DisableApplicationInsights = $True
+            ErrorAction                = 'Stop'
         }
         # If PlanName is provided, you cannot set the Location anymore.
         # Therefore, we set the PlanName and don't set the Location, if PlanName is provided.
