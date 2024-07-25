@@ -225,7 +225,7 @@
         }
 
         #Enable soft delete for blobs
-        $ctx = New-AzStorageContext -StorageAccountName icewolfmtasts
+        $ctx = New-AzStorageContext -StorageAccountName $StorageAccountName
         Enable-AzStorageDeleteRetentionPolicy -RetentionDays 7 -Context $ctx
 
 
