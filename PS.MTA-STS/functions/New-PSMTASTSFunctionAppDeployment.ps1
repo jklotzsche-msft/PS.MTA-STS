@@ -224,6 +224,11 @@
             }
         }
 
+        #Enable soft delete for blobs
+        $ctx = New-AzStorageContext -StorageAccountName icewolfmtasts
+        Enable-AzStorageDeleteRetentionPolicy -RetentionDays 7 -Context $ctx
+
+
         # Create Function App
         Write-Verbose "Creating Azure Function App $FunctionAppName..."
         $newAzFunctionAppProps = @{
