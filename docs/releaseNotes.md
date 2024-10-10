@@ -8,6 +8,17 @@ To update the module to the latest version, use the following command:
 Update-Module -Name PS.MTA-STS
 ```
 
+## Version 1.3.0
+
+The 1.3.0 release of the PS.MTA-STS module includes (but is not limited to) the following changes and improvements:
+
+- Major change: added compatibility to SMTP DANE with DNSSEC MX records. This enables you to use this solution even if you have multiple MX records for your domains. This could be the case, if you have some domains pointing to the known `*.mail.protection.outlook.com` MX record and some domains pointing to the new `mx.microsoft` endpoints for SMTP DANE with DNSSEC ([GitHub Issue #38](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/38)) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- Improved error handling in all functions, which will also prevent functions from failing because of warning messages ([GitHub Issue #37](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/37))
+- Upgraded Function Runtime to PowerShell 7.4 in docs and automatic deployment ([GitHub Issue #35](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/35)) --> Thanks to [dreamaker69](https://github.com/dreamaker69)
+- Added information about the retirement of Classic Application Insights to the FAQ, additionally added a new switch parameter to disable Application Insights for new deployments in `New-PSMTASTSFunctionAppDeployment` ([GitHub Issue #34](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/34)) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- Enabled soft delete for blobs in the storage account in `New-PSMTASTSFunctionAppDeployment` by adding new parameter `StorageDeleteRetentionInDays` which defaults to 7 days (suggested as part of [GitHub Pull Request #33](https://github.com/jklotzsche-msft/PS.MTA-STS/pull/33)) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- Lot's of documentation improvements, including an improved section about the MTA-STS policy file
+
 ## Version 1.2.2
 
 The 1.2.2 release of the PS.MTA-STS module includes (but is not limited to) the following changes and improvements:

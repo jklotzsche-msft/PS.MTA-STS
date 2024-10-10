@@ -21,3 +21,35 @@ Yes, you can specify an existing App Service Plan when deploying the Azure Funct
 ## How do I test MTA-STS for my domain?
 
 You can use the `Test-PSMTASTSConfiguration` function to test MTA-STS for your domain. Test-PSMTASTSConfiguration checks if MTA-STS is configured correctly for all domains in a CSV file. It checks if the TXT record is configured correctly, CNAME record is configured correctly, policy file is available and MX record is configured correctly.
+
+## I created the Function App with runtime "PowerShell 7.2", but it's about to be deprecated. How can I update the runtime?
+
+Luckily, you do not have to rebuild your Function App from scratch. You can update the existing Function App to the latest runtime through the Azure Portal. Please see the [official documentation from Microsoft](https://github.com/Azure/azure-functions-powershell-worker/wiki/Upgrading-your-Azure-Function-Apps-to-run-on-PowerShell-7.4#how-to-upgrade) for more information.
+
+## "Classic Application Insights was retired on February 29, 2024" message in Application Insights resource. What does this mean?
+
+This message is a notification from Microsoft that the Classic Application Insights resource has been retired. You can safely ignore this message as it does not affect the functionality of the MTA-STS module or your Azure Function App by default. If you want to learn more about the retirement of Classic Application Insights, check out the [official documentation from Microsoft](https://azure.microsoft.com/en-us/updates/we-re-retiring-classic-application-insights-on-29-february-2024/).
+
+Additionally, you can disable Application Insights for new deployments of the Azure Function App by adding the `-DisableApplicationInsights` switch parameter in the `New-PSMTASTSFunctionAppDeployment` function. By default, Application Insights is enabled for new deployments of the Azure Function App.
+
+## I enabled DNSSEC and SMTP DANE for some domains. Do I have to do something with my MTA-STS configuration?
+
+Yes, if you enabled DNSSEC and SMTP DANE for some domains, you have to adjust the MTA-STS policy file to include the MX endpoint of your domain. You can update the MTA-STS policy file manually in the Azure Portal or automatically using the `Update-PSMTASTSFunctionAppFile` function. By using the `Update-PSMTASTSFunctionAppFile` function, the `*.mail.protection.outlook.com` MX endpoint will be added automatically to the MTA-STS policy file. The following example shows how to update the MTA-STS policy file to include the MX endpoint of your domains:
+
+``` PowerShell
+Update-PSMTASTSFunctionAppFile -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS' -PolicyMode 'Enforce' -ExoHostName '*.a-v1.mx.microsoft', '*.b-v1.mx.microsoft', '*.c-v1.mx.microsoft'
+```
+
+Afterwards, your MTA-STS policy file would look like this:
+
+``` Text
+version: STSv1
+mode: enforce
+mx: mail.protection.outlook.com
+mx: *.a-v1.mx.microsoft
+mx: *.b-v1.mx.microsoft
+mx: *.c-v1.mx.microsoft
+max_age: 604800
+```
+
+> **IMPORTANT NOTE** Please remember, that you should not use `*.mx.microsoft` for your DNSSEC and SMTP DANE enabled domains. Instead, you should use the full MX endpoint for your domain or the wildcard for your MX endpoints in a certain, auto-generated sub-zone. So if you have `contoso-com.a-v1.mx.microsoft` as MX record for your `contoso.com` domain, you can add it to the MTA-STS policy file as `*.a-v1.mx.microsoft` or `contoso-com.a-v1.mx.microsoft` but NOT as `*.mx.microsoft`.
