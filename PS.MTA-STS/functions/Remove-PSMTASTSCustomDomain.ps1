@@ -151,7 +151,7 @@
             HostNames         = $customDomainsToSet
         }
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Remove custom domains")) {
-            $null = Set-AzWebApp @setAzWebApp
+            $null = Set-AzWebApp @setAzWebApp -WarningAction SilentlyContinue
         }
 
         #Remove Managed Certificate if needed

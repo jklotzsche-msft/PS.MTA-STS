@@ -17,6 +17,7 @@ The 1.3.0 release of the PS.MTA-STS module includes (but is not limited to) the 
 - Upgraded Function Runtime to PowerShell 7.4 in docs and automatic deployment ([GitHub Issue #35](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/35)) --> Thanks to [dreamaker69](https://github.com/dreamaker69)
 - Added information about the retirement of Classic Application Insights to the FAQ, additionally added a new switch parameter to disable Application Insights for new deployments in `New-PSMTASTSFunctionAppDeployment` ([GitHub Issue #34](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/34)) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
 - Enabled soft delete for blobs in the storage account in `New-PSMTASTSFunctionAppDeployment` by adding new parameter `StorageDeleteRetentionInDays` which defaults to 7 days (suggested as part of [GitHub Pull Request #33](https://github.com/jklotzsche-msft/PS.MTA-STS/pull/33)) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- Added Check of Certification Authority Authorization [CAA Record](https://de.wikipedia.org/wiki/DNS_Certification_Authority_Authorization) and Parameter -SkipCAACheck in Add-PSMTASTSCustomDomain Function --> Thanks to [BohrenAn](https://github.com/BohrenAn)
 - Lot's of documentation improvements, including an improved section about the MTA-STS policy file
 
 ## Version 1.2.2
