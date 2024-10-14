@@ -49,6 +49,11 @@
         Reads list of accepted domains from "C:\temp\accepted-domains.csv" and checks if MTA-STS is configured correctly for each domain in Function App "func-MTA-STS".
 
         .EXAMPLE
+        Test-PSMTASTSConfiguration -DomainName "contoso.com", "fabrikam.com" -FunctionAppName "func-MTA-STS" -ExoHostName "mail.contoso.com"
+
+        Checks if MTA-STS is configured correctly for domains "contoso.com" and "fabrikam.com" in Function App "func-MTA-STS". The ExoHostName parameter is used to add the MX record for "mail.contoso.com" to the MTA-STS policy file tests.
+
+        .EXAMPLE
         Test-PSMTASTSConfiguration -CsvPath "C:\temp\accepted-domains.csv" -FunctionAppName "func-MTA-STS" -ExportResult -ResultPath "C:\temp\mta-sts-result.csv"
 
         Reads list of accepted domains from "C:\temp\accepted-domains.csv" and checks if MTA-STS is configured correctly for each domain in Function App "func-MTA-STS". It also exports result to "C:\temp\mta-sts-result.csv".
@@ -159,10 +164,10 @@ max_age: 604800
             Write-Verbose "Checking $counter / $($domainList.count) - $($domain)"
 
             $CNameHost = Resolve-DnsName -Name "mta-sts.$Domain" -Type "CNAME"
-            If ($Null -ne $CNameHost)
-            {
+            If ($Null -ne $CNameHost) {
                 $Hostname = $CNameHost.NameHost
-            } else {
+            }
+            else {
                 $Hostname = ""
             }
 
