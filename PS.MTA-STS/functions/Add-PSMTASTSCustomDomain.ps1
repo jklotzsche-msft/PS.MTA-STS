@@ -21,6 +21,9 @@
         .PARAMETER DoNotAddManagedCertificate
         Switch to not add managed certificate to Function App. This is useful, if you want to use your own certificate.
 
+        .PARAMETER SkipCAACheck
+        Switch to skip the Certification Authority Authorization (CAA) check.
+
         .PARAMETER CsvEncoding
         Provide encoding of csv file. Default is "UTF8".
 
@@ -66,9 +69,11 @@
         [Parameter(Mandatory = $true)]
         [string]
         $FunctionAppName,
-
         [switch]
         $DoNotAddManagedCertificate,
+
+        [switch]
+        $SkipCAACheck,
 
         [Parameter(ParameterSetName = "Csv")]
         [string]
@@ -145,7 +150,21 @@
                 Write-Warning "CNAME record not found for $mtaStsDomain with value $FunctionAppName.azurewebsites.net. Found value: $mtaStsCName - Please create/update it and try again with this domain. Continuing with next domain."
                 continue
             }
-            
+
+            #Check if CAA record exists and contains digicert.com
+            If ($SkipCAACheck -ne $true) 
+            {
+                $json = Invoke-RestMethod -URI "https://dns.google/resolve?name=$Domain&type=CAA"
+                If ($Null -ne $json.Answer.Data)
+                {
+                    if (($json.Answer.Data -notcontains '0 issue "digicert.com"') -eq $True)
+                    {
+                        Write-Warning "Missing digicert.com in Certification Authority Authorization (CAA) Record for $Domain"
+                        continue
+                    }
+                }
+            }
+
             # Add domain to list, if it is not already added
             if ($mtaStsDomain -notin $customDomainNames.CustomDomains) {
                 $newCustomDomainsToAdd += $mtaStsDomain
@@ -172,7 +191,7 @@
             HostNames         = $customDomainsToSet
         }
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Add custom domains")) {
-            $null = Set-AzWebApp @setAzWebApp
+            $null = Set-AzWebApp @setAzWebApp -WarningAction SilentlyContinue
         }
 
         # Stop here, if we should not add managed certificate
@@ -194,7 +213,7 @@
                 SslState          = "SniEnabled"
             }
             if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Add certificate for $newCustomDomainToAdd")) {
-                $null = New-AzWebAppCertificate @newAzWebAppCertificate
+                $null = New-AzWebAppCertificate @newAzWebAppCertificate -WarningAction SilentlyContinue
             }
         }
     }

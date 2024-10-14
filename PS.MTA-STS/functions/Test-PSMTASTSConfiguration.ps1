@@ -24,9 +24,6 @@
         .PARAMETER DisplayResult
         Provide a Boolean value, if the result should be displayed in the console. Default is $true.
 
-        .PARAMETER FunctionAppName
-        Provide name of Function App.
-
         .PARAMETER ExportResult
         Switch Parameter. Export result to CSV file.
         
@@ -65,10 +62,6 @@
         [Parameter(Mandatory = $true, ParameterSetName = "DomainName")]
         [string[]]
         $DomainName,
-
-        [Parameter(Mandatory = $true)]
-        [string]
-        $FunctionAppName,
 
         [String]
         $DnsServer = "8.8.8.8",
@@ -165,6 +158,14 @@ max_age: 604800
         foreach ($domain in $domainList) {
             Write-Verbose "Checking $counter / $($domainList.count) - $($domain)"
 
+            $CNameHost = Resolve-DnsName -Name "mta-sts.$Domain" -Type "CNAME"
+            If ($Null -ne $CNameHost)
+            {
+                $Hostname = $CNameHost.NameHost
+            } else {
+                $Hostname = ""
+            }
+
             #Progress Bar
             [int]$Percent = 100 / $domainListCount * $counter
             Write-Progress -Activity "Test in Progress" -Status "$Percent% Complete:" -PercentComplete $Percent
@@ -172,7 +173,7 @@ max_age: 604800
             # Prepare result object
             $resultObject = [PSCustomObject]@{
                 DomainName            = $domain
-                Host                  = "$FunctionAppName.azurewebsites.net"
+                Host                  = $Hostname
                 MX_Record_Pointing_To = ""
                 # MX_Record_Result      = ""
                 MTA_STS_CNAME         = ""
@@ -192,7 +193,7 @@ max_age: 604800
                 $resultObject.MTA_STS_TXTRecord = "OK"
             }
             elseif ($mtaStsTXTRecord -and ($mtaStsTXTRecord.strings -notlike $txtRecordContent)) {
-                $resultObject.MTA_STS_TXTRecord = "TXT record does not contain the expected content. The following content was found: $($txtRecord.strings -join ", ")"
+                $resultObject.MTA_STS_TXTRecord = "TXT record does not contain the expected content. The following content was found: $($mtaStsTXTRecord.strings -join ", ")"
                 $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
             }
             else {
