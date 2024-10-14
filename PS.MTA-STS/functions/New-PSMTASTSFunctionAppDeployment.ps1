@@ -28,11 +28,18 @@
         If the Azure Function App exists, it will be updated with the latest PowerShell code. This will overwrite any changes you made to the Azure Function App!
 
     .PARAMETER RegisterResourceProvider
-        Use this Parameter to Register Resource Provider 'Microsoft.Web' if it is not yet registered
+        Use this Parameter to Register Resource Provider 'Microsoft.Web' if it is not yet registered.
+
+    .PARAMETER DisableApplicationInsights
+        By default, Application Insights is enabled during the creation of the Azure Function App.
+        Use this parameter to disable the creation of the application insights resource during the function app creation. No logs will be available then.
 
     .PARAMETER StorageAccountName
         Provide the name of the Azure Storage Account, which should be created.
         If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
+
+    .PARAMETER StorageDeleteRetentionInDays
+        Provide the number of days to retain the deleted blobs. Default is 7 days.
 
     .PARAMETER PlanName
         Provide the name of the Azure App Service Plan, which should be created.
@@ -43,6 +50,12 @@
 
     .PARAMETER PolicyMode
         Specifies if the policy is in "Enforce" mode or "Testing" mode
+
+    .PARAMETER ExoHostName
+        Provide a list of hostnames, which should be included in the MTA-STS policy.
+        The list of hostnames must be valid, which means that they must be valid domain names.
+        Additionally, they cannot start with a wildcard because it will be added automatically.
+        *.mail.protection.outlook.com will be added automatically to the list of hostnames.
 
     .PARAMETER DnsServer
         Provide a String containing the IP address of the DNS server, which should be used to query the MX record. Default is 8.8.8.8 (Google DNS).
@@ -110,37 +123,62 @@
         [String]
         $PlanName,
 
+        [int]
+        $StorageDeleteRetentionInDays = 7,
+
         [ValidateSet("Enforce", "Testing", "None")] # ValidateSet is used to limit the possible values
         [String]
         $PolicyMode = "Enforce",
+
+        [ValidateScript({
+                # the provided list of hostnames must be valid, which means that they must be valid domain names
+                # Domain Names cannot start with a dot, so we need to check for that
+                # Additionally, they can start with a wildcard, if subdomains should be included
+                foreach ($hostname in $_) {
+                    if ($hostname -notmatch "^[a-zA-Z0-9][a-zA-Z0-9-_.]*$" -and $hostname -notmatch "^\*.[a-zA-Z0-9][a-zA-Z0-9-_.]*$") {
+                        throw "MX endpoint '$hostname' is not valid. The name can contain only letters, numbers, hyphens, underscores and periods. You can also start with a wildcard character to include subdomains."
+                    }
+
+                    if ($hostname -like "*mail.protection.outlook.com") {
+                        throw "MX endpoint '$hostname' cannot be added, because the DNS zone '*.mail.protection.outlook.com' will be added automatically. Please remove it from the list."
+                    }
+                }
+                # if the list of entries is valid, return $true
+                $true
+            })]
+        [String[]]
+        $ExoHostName,
 
         [String]
         $DnsServer = "8.8.8.8",
 
         #Register AZ Resource Provider
         [Switch]
-        $RegisterResourceProvider
+        $RegisterResourceProvider,
+
+        #Disable Application Insights
+        [Switch]
+        $DisableApplicationInsights
     )
     #endregion Parameter
 
     begin {
+        # Trap errors
+        trap {
+            throw $_
+        }
+
+        # Preset ActionPreference to Stop, if not set by user through common parameters
+        if (-not $PSCmdlet.MyInvocation.BoundParameters.ContainsKey('ErrorAction')) { $local:ErrorActionPreference = "Stop" }
+
         # Check if PowerShell is connected to Azure
         if ( -not (Get-AzContext)) {
-            Write-Warning "Connecting to Azure service..."
-            $null = Connect-AzAccount -ErrorAction Stop
+            Write-Verbose "Connecting to Azure service..."
+            $null = Connect-AzAccount
         }
     }
     
     process {
-        # Preset ErrorActionPreference to Stop
-        $ErrorActionPreference = "Stop"
-
-        # Trap errors
-        trap {
-            Write-Error $_
-            return
-        }
-        
         # Check, if Location is valid
         Write-Verbose "Checking if location '$($Location)' is valid."
         $validLocations = Get-AzLocation | Select-Object -ExpandProperty location
@@ -177,12 +215,12 @@
                 Register-AzResourceProvider -ProviderNamespace Microsoft.Web
             }
             else {
-                Write-Warning -Message "Azure Resource Provider 'Microsoft.Web' is not registered. Use the -RegisterResourceProvider Parameter to register the Resource Provider."
+                Write-Warning -Message "Azure Resource Provider 'Microsoft.Web' is not registered. Please register the Azure Resource Provider 'Microsoft.Web' manually afterwards. See https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-providers-and-types#register-resource-provider for more information."
             }
         }
 
         # Check if Storage StorageAccountName already exists
-        $storageAccountDnsResult = Resolve-PSMTASTSDnsName -Name "$StorageAccountName.blob.core.windows.net" -Type A -Server $DnsServer -ErrorAction Stop
+        $storageAccountDnsResult = Resolve-PSMTASTSDnsName -Name "$StorageAccountName.blob.core.windows.net" -Type A -Server $DnsServer
         if ($null -ne $storageAccountDnsResult) {
             $StorageAccounts = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName
 
@@ -202,7 +240,7 @@
         }
 
         # Check, if FunctionApp exists already
-        $functionAppDnsResult = Resolve-PSMTASTSDnsName -Name "$FunctionAppName.azurewebsites.net" -Type A -Server $DnsServer -ErrorAction Stop
+        $functionAppDnsResult = Resolve-PSMTASTSDnsName -Name "$FunctionAppName.azurewebsites.net" -Type A -Server $DnsServer
         if ($null -ne $functionAppDnsResult) {
             throw "Function App already exists. Please provide a different name for the Function Account."
         }
@@ -217,11 +255,19 @@
                 SkuName                = 'Standard_LRS'
                 AllowBlobPublicAccess  = $false
                 EnableHttpsTrafficOnly = $true
-                ErrorAction            = 'Stop'
             }
             if ($PSCmdlet.ShouldProcess("Storage Account $StorageAccountName", "Create")) {
                 $null = New-AzStorageAccount @newAzStorageAccountProps
             }
+        }
+
+        # Enable soft delete for blobs
+        try {
+            $ctx = New-AzStorageContext -StorageAccountName $StorageAccountName
+            $null = Enable-AzStorageDeleteRetentionPolicy -RetentionDays $StorageDeleteRetentionInDays -Context $ctx
+        }
+        catch {
+            Write-Warning "Could not enable soft delete for blobs in Storage Account $StorageAccountName. Please enable it manually, if needed."
         }
 
         # Create Function App
@@ -233,8 +279,7 @@
             StorageAccountName = $StorageAccountName
             FunctionsVersion   = '4'
             OSType             = 'Windows'
-            RuntimeVersion     = '7.2'
-            ErrorAction        = 'Stop'
+            RuntimeVersion     = '7.4'
         }
         # If PlanName is provided, you cannot set the Location anymore.
         # Therefore, we set the PlanName and don't set the Location, if PlanName is provided.
@@ -244,6 +289,10 @@
         }
         else {
             $newAzFunctionAppProps.Location = $Location
+        }
+        # Disable Application Insights, if provided
+        if ($DisableApplicationInsights) {
+            $newAzFunctionAppProps.DisableApplicationInsights = $true
         }
         # Create Function App
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Create")) {
@@ -257,7 +306,7 @@
         # Remove AzureWebJobsDashboard, as it is deprecated
         $functionAppSettingsToRemove = @("AzureWebJobsDashboard")
         $FunctionAppSettings = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName
-        foreach($functionAppSettingToRemove in $functionAppSettingsToRemove) {
+        foreach ($functionAppSettingToRemove in $functionAppSettingsToRemove) {
             if ($FunctionAppSettings.Keys -contains $functionAppSettingToRemove) {
                 Write-Verbose "Remove $functionAppSettingToRemove App Setting from Function App $FunctionAppName..."
                 Remove-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -AppSettingName $functionAppSettingToRemove -Confirm:$false -Force
@@ -269,6 +318,9 @@
             ResourceGroupName = $ResourceGroupName
             FunctionAppName   = $FunctionAppName
             PolicyMode        = $PolicyMode
+        }
+        if ($ExoHostName) {
+            $updateFunctionAppProps.ExoHostName = $ExoHostName
         }
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update")) {
             $null = Update-PSMTASTSFunctionAppFile @updateFunctionAppProps

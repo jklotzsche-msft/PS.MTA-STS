@@ -149,9 +149,9 @@ On the new page, enter the following information (as described at step 4 of [Enh
 - Basics
   - Subscription: Select your subscription
   - Resource group: Select the resource group you created in the previous step
-  - Function App Name: MTA-STS-FunctionApp (or any other name you like and complies with the naming rules)
+  - Function App Name: func-MTA-STS (or any other name you like and complies with the naming rules)
   - Runtime stack: PowerShell Core
-  - Version: 7.2
+  - Version: 7.4
   - Region: Select the same region as you selected for the resource group
   - Operating System: Windows
   - Hosting options and plans: Consumption (Serverless)
@@ -251,6 +251,16 @@ Now, we can add the code to the function. To do so, select "Code + Test" and cop
 
 1. run.ps1
 
+The run.ps1 file is responsible for returning the MTA-STS policy. The following code will return a MTA-STS policy in enforce mode for the domain. If you want to test the policy without enforcing it, replace 'enforce' with 'testing' in the $mtaStsPolicy variable.
+
+  > **NOTE** If you want to include additional MX records, add additional mx lines like shown below. This can be useful if you have multiple MX records for your domains, because you want to take advantage of SMTP DANE with DNSSEC<br>
+  version: STSv1<br>
+  mode: enforce<br>
+  mx: *.mail.protection.outlook.com<br>
+  mx: *.abcd-v1.mx.microsoft<br>
+  mx: smtp.contoso.com<br>
+  max_age: 604800<br>
+
 ```PowerShell
 param ($Request, $TriggerMetadata)
 
@@ -266,6 +276,18 @@ mode: enforce
 mx: *.mail.protection.outlook.com
 max_age: 604800
 "@
+<#
+## If you want to include additional MX records, add additional mx lines like this:
+## This can be useful if you have multiple MX records for your domains, because you want to take advantage of SMTP DANE with DNSSEC, but you don't want to create separate MTA-STS policies for each MX record
+$mtaStsPolicy = @"
+version: STSv1
+mode: enforce
+mx: *.mail.protection.outlook.com
+mx: *.abcd-v1.mx.microsoft
+mx: smtp.contoso.com
+max_age: 604800
+"@
+#>
 
 # Return the response
 try {
@@ -289,9 +311,9 @@ catch {
 }
 ```
 
-> **NOTE** This sample code will publish a MTA-STS policy in enforce mode for the domain. If you want to test the policy without enforcing it, replace 'enforce' with 'testing' in the $mtaStsPolicy variable.
-
 2. function.json
+
+The function.json file is responsible for the configuration of the function. The following code will configure the function to be triggered by a HTTP request and to return a HTTP response.
 
 ```json
 {

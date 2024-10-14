@@ -48,6 +48,17 @@ mx: *.mail.protection.outlook.com
 max_age: 604800
 ```
 
+If you want to take advantage of [SMTP DANE with DNSSEC](https://techcommunity.microsoft.com/t5/exchange-team-blog/implementing-inbound-smtp-dane-with-dnssec-for-exchange-online/ba-p/3939694) you must adjust the MX endpoint of your domains. Additionally, you will have to adjust the mta-sts.txt file to include the MX endpoint of your domain.
+You can update the mta-sts.txt file to include the MX endpoint of your domain manually in the Azure Portal or automatically using the `Update-PSMTASTSFunctionAppFile` function.
+
+``` Text
+version: STSv1
+mode: enforce
+mx: mail.protection.outlook.com
+mx: *.abcd-v1.mx.microsoft
+max_age: 604800
+```
+
 ## SMTP TLS Reporting (TLSRPT)
 
 Defined in [rfc8460](https://datatracker.ietf.org/doc/html/rfc8460)
@@ -114,6 +125,8 @@ Update-PSMTASTSFunctionAppFile -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName
 # Updates the Azure Function App with the name 'PSMTASTS' in the resource group 'PSMTASTS' with policy mode 'Enforce'.
 # This will overwrite any changes you made to the Azure Function App!
 ```
+
+You can also use the `Update-PSMTASTSFunctionAppFile` function to update the MTA-STS policy for your domains automatically. This function will update the MTA-STS policy for your domains and will also update the Azure Function App with the latest version of this module. That's especially useful if you want to add new MX endpoints, because you want to take advantage of [SMTP DANE with DNSSEC](https://techcommunity.microsoft.com/t5/exchange-team-blog/implementing-inbound-smtp-dane-with-dnssec-for-exchange-online/ba-p/3939694).
 
 If you want to migrate or rebuild your MTA-STS deployment, check out our [Migrate MTA-STS deployment from Azure Static Web App or old Azure Function App to new Azure Function App](./docs/migrateFunctionApp.md) guide.
 
