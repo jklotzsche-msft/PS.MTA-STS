@@ -152,13 +152,10 @@
             }
 
             #Check if CAA record exists and contains digicert.com
-            If ($SkipCAACheck -ne $true) 
-            {
-                $json = Invoke-RestMethod -URI "https://dns.google/resolve?name=$Domain&type=CAA"
-                If ($Null -ne $json.Answer.Data)
-                {
-                    if (($json.Answer.Data -notcontains '0 issue "digicert.com"') -eq $True)
-                    {
+            If ($SkipCAACheck -ne $true) {
+                $json = Invoke-RestMethod -Uri "https://dns.google/resolve?name=$Domain&type=CAA"
+                If ($Null -ne $json.Answer.Data) {
+                    if (($json.Answer.Data -notcontains '0 issue "digicert.com"') -eq $True) {
                         Write-Warning "Missing digicert.com in Certification Authority Authorization (CAA) Record for $Domain"
                         continue
                     }
