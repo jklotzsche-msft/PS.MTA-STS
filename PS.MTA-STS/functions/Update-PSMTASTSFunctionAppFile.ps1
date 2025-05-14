@@ -185,5 +185,15 @@
         if (Test-Path -Path $workingDirectory) {
             $null = Get-ChildItem -Path $workingDirectory -Recurse | Remove-Item -Recurse -Force -Confirm:$false
         }
+
+        #Upate Strage Account to TLS 1.2
+        Write-Verbose "Update Storage Account to TLS 1.2"
+        $FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+        $StorageAccountName = $FunctionAppSetting.WEBSITE_CONTENTAZUREFILECONNECTIONSTRING.split(";")[1].Replace("AccountName=", "")
+        $StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -ErrorAction SilentlyContinue
+        If ($Null -ne $StorageAccount) 
+        {
+            $Null = Set-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -MinimumTlsVersion "TLS1_2" -ErrorAction SilentlyContinue
+        }
     }
 }

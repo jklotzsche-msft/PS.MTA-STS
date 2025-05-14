@@ -8,6 +8,15 @@ To update the module to the latest version, use the following command:
 Update-Module -Name PS.MTA-STS
 ```
 
+## Version 1.3.1
+
+The 1.3.1 release of the PS.MTA-STS module includes (but is not limited to) the following changes and improvements:
+
+- New-PSMTASTSFunctionAppDeployment set Storage Account to TLS1.2
+- Update-PSMTASTSFunctionAppFile updates Storage Account to TLS1.2
+- Remove-PSMTASTSFunctionAppDeployment removes FunctionApp, Storage Account and App Service Plan
+- ToDo: Resolve-PSMTASTSDnsName.ps1 upated to DNS over HTTPS
+
 ## Version 1.3.0
 
 The 1.3.0 release of the PS.MTA-STS module includes (but is not limited to) the following changes and improvements:
