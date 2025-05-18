@@ -256,7 +256,6 @@
                 AllowBlobPublicAccess  = $false
                 EnableHttpsTrafficOnly = $true
                 MinimumTlsVersion      = "TLS1_2"
-                EnableHttpsTrafficOnly = $True
                 EnableSftp             = $false
             }
             if ($PSCmdlet.ShouldProcess("Storage Account $StorageAccountName", "Create")) {

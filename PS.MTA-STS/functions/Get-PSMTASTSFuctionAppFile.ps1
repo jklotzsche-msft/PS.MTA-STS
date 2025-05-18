@@ -1,46 +1,28 @@
-function Remove-PSMTASTSFunctionAppDeployment {
+## Experimental Function
+
+function Update-PSMTASTSFunctionAppFile {
     <#
     .SYNOPSIS
-        Removes the Azure Function App with the needed PowerShell code to publish MTA-STS policies.
+        Publishes Azure Function App files and functions to Azure Function App.
 
     .DESCRIPTION
-        Creates an Azure Function App with the needed PowerShell code to publish MTA-STS policies.
-        The Azure Function App will be created in the specified resource group and location.
-        If the resource group doesn't exist, it will be created.
-        If the Azure Function App doesn't exist, it will be created.
-        If the Azure Function App exists, it will be updated with the latest PowerShell code. This will overwrite any changes you made to the Azure Function App!
-
+        Publishes Azure Function App files and functions to Azure Function App.
+        The Azure Function App will be updated with the latest PowerShell code.
+        This will overwrite any changes you may have made to the Azure Function App!
+        
     .PARAMETER ResourceGroupName
-        Provide the name of the Azure resource group, where the Azure Function App should be created.
-        If the resource group doesn't exist, it will be created.
-        If the resource group exists already, it will be used.
-
+        Provide the name of the Azure resource group, where the Azure Function App should be updated.
+    
     .PARAMETER FunctionAppName
-        Provide the name of the Azure Function App, which should be created.
-        If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
-        If the Azure Function App exists, it will be updated with the latest PowerShell code. This will overwrite any changes you made to the Azure Function App!
-
-    .PARAMETER StorageAccountName
-        Provide the name of the Azure Storage Account, which should be created.
-        If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
-
-    .PARAMETER PlanName
-        Provide the name of the Azure App Service Plan, which should be created.
-        If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
-
-        If the PlanName is provided, the location will be set to the location of the App Service Plan.
-        The location will still be used to create the resource group.
+        Provide the name of the Azure Function App, which should be updated.
 
     .EXAMPLE
-        New-PSMTASTSFunctionAppDeployment -Location 'West Europe' -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS' -StorageAccountName 'stpsmtasts'
-        
-        Creates an Azure Function App with the name 'PSMTASTS' in the resource group 'PSMTASTS' in the location 'West Europe' with policy mode 'Enforce'.
-        If the resource group doesn't exist, it will be created.
-        If the Azure Function App doesn't exist, it will be created and app files published.
+        Update-PSMTASTSFunctionAppFile -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS'
 
     .LINK
         https://github.com/jklotzsche-msft/PS.MTA-STS
-    #>
+	#>
+
 
     #region Parameter
     [CmdletBinding(SupportsShouldProcess = $true)]
@@ -69,6 +51,7 @@ function Remove-PSMTASTSFunctionAppDeployment {
         [String]
         $FunctionAppName,
 
+		<#
         [Parameter(Mandatory = $true)]
         [ValidateScript({
                 if ($_.length -lt 3 -or $_.length -gt 24 -or $_ -notmatch "^[a-z0-9]*$") {
@@ -80,6 +63,7 @@ function Remove-PSMTASTSFunctionAppDeployment {
             })]
         [String]
         $StorageAccountName
+		#>
     )
     #endregion Parameter
 
@@ -104,7 +88,7 @@ function Remove-PSMTASTSFunctionAppDeployment {
 			$FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
 			$StorageAccountName = $FunctionAppSetting.WEBSITE_CONTENTAZUREFILECONNECTIONSTRING.split(";")[1].Replace("AccountName=", "")
 			$StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -ErrorAction SilentlyContinue
-
+<#
 			#Delete Function App
 			Write-Verbose "Deleting Function App $FunctionAppName in Resource Group $ResourceGroupName"
 			$null = Remove-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -Force -ErrorAction SilentlyContinue
@@ -116,9 +100,23 @@ function Remove-PSMTASTSFunctionAppDeployment {
 			#Delete App Service Plan
 			Write-Verbose "Deleting App Service Plan $AppServicePlan in Resource Group $ResourceGroupName"
 			$null = Remove-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $AppServicePlan -Force -ErrorAction SilentlyContinue
+#>
 		}
 	}
 
 	process {
+		#Get the functions of a Function App
+		$FunctionApp = Get-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+		If ($FunctionApp -eq $null) {
+			Write-Verbose "Function App $FunctionAppName not found. Nothing to remove."
+			return
+		} else{
+			#Get the functions of a Function App
+			$Functions = Get-AzFunctionAppFunction -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+
+			#Publish the function app
+			Write-Verbose "Publishing Function App $FunctionAppName in Resource Group $ResourceGroupName"
+			$null = Publish-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -Force -ErrorAction SilentlyContinue
+		}
 	}
 }
