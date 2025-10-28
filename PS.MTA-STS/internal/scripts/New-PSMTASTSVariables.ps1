@@ -1,4 +1,5 @@
-﻿$script:PSMTASTS_hostJson = @'
+﻿#https://learn.microsoft.com/en-us/azure/azure-functions/extension-bundles#upgrade-extension-bundles
+$script:PSMTASTS_hostJson = @'
 {
     "version": "2.0",
     "extensions": {
@@ -19,7 +20,7 @@
     },
     "extensionBundle": {
         "id": "Microsoft.Azure.Functions.ExtensionBundle",
-        "version": "[4.*, 5.0.0)"
+        "version": "[4.0.0, 5.0.0)"
     }
 }
 '@
