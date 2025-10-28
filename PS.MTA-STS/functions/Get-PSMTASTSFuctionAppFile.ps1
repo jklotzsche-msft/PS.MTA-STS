@@ -21,7 +21,7 @@ function Update-PSMTASTSFunctionAppFile {
 
     .LINK
         https://github.com/jklotzsche-msft/PS.MTA-STS
-	#>
+    #>
 
 
     #region Parameter
@@ -49,9 +49,9 @@ function Update-PSMTASTSFunctionAppFile {
                 }
             })]
         [String]
-        $FunctionAppName,
+        $FunctionAppName
 
-		<#
+        <#
         [Parameter(Mandatory = $true)]
         [ValidateScript({
                 if ($_.length -lt 3 -or $_.length -gt 24 -or $_ -notmatch "^[a-z0-9]*$") {
@@ -63,60 +63,60 @@ function Update-PSMTASTSFunctionAppFile {
             })]
         [String]
         $StorageAccountName
-		#>
+        #>
     )
     #endregion Parameter
 
     begin {
         # Trap errors
-		trap {
-			throw $_
-		}
+        trap {
+            throw $_
+        }
 
-		$FunctionApp = Get-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
-		If ($FunctionApp -eq $null) {
-			Write-Verbose "Function App $FunctionAppName not found. Nothing to remove."
-			return
-		} else{
-			#Getting App Service Plan
-			$AppServicePlan = $FunctionApp.AppServicePlan
+        $FunctionApp = Get-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+        If ($FunctionApp -eq $null) {
+            Write-Verbose "Function App $FunctionAppName not found. Nothing to remove."
+            return
+        } else{
+            #Getting App Service Plan
+            $AppServicePlan = $FunctionApp.AppServicePlan
 
-			#Get Function AppSetting for Storage Account
-        	$FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
-		
-			#Get Storage Account
-			$FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
-			$StorageAccountName = $FunctionAppSetting.WEBSITE_CONTENTAZUREFILECONNECTIONSTRING.split(";")[1].Replace("AccountName=", "")
-			$StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -ErrorAction SilentlyContinue
+            #Get Function AppSetting for Storage Account
+            $FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+        
+            #Get Storage Account
+            $FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+            $StorageAccountName = $FunctionAppSetting.WEBSITE_CONTENTAZUREFILECONNECTIONSTRING.split(";")[1].Replace("AccountName=", "")
+            $StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -ErrorAction SilentlyContinue
 <#
-			#Delete Function App
-			Write-Verbose "Deleting Function App $FunctionAppName in Resource Group $ResourceGroupName"
-			$null = Remove-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -Force -ErrorAction SilentlyContinue
+            #Delete Function App
+            Write-Verbose "Deleting Function App $FunctionAppName in Resource Group $ResourceGroupName"
+            $null = Remove-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -Force -ErrorAction SilentlyContinue
 
-			#Delete Storage Account
-			Write-Verbose "Deleting Storage Account $StorageAccountName in Resource Group $ResourceGroupName"
-			$null = Remove-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -Force -ErrorAction SilentlyContinue
+            #Delete Storage Account
+            Write-Verbose "Deleting Storage Account $StorageAccountName in Resource Group $ResourceGroupName"
+            $null = Remove-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -Force -ErrorAction SilentlyContinue
 
-			#Delete App Service Plan
-			Write-Verbose "Deleting App Service Plan $AppServicePlan in Resource Group $ResourceGroupName"
-			$null = Remove-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $AppServicePlan -Force -ErrorAction SilentlyContinue
+            #Delete App Service Plan
+            Write-Verbose "Deleting App Service Plan $AppServicePlan in Resource Group $ResourceGroupName"
+            $null = Remove-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $AppServicePlan -Force -ErrorAction SilentlyContinue
 #>
-		}
-	}
+        }
+    }
 
-	process {
-		#Get the functions of a Function App
-		$FunctionApp = Get-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
-		If ($FunctionApp -eq $null) {
-			Write-Verbose "Function App $FunctionAppName not found. Nothing to remove."
-			return
-		} else{
-			#Get the functions of a Function App
-			$Functions = Get-AzFunctionAppFunction -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+    process {
+        #Get the functions of a Function App
+        $FunctionApp = Get-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+        If ($FunctionApp -eq $null) {
+            Write-Verbose "Function App $FunctionAppName not found. Nothing to remove."
+            return
+        } else{
+            #Get the functions of a Function App
+            $Functions = Get-AzFunctionAppFunction -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
 
-			#Publish the function app
-			Write-Verbose "Publishing Function App $FunctionAppName in Resource Group $ResourceGroupName"
-			$null = Publish-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -Force -ErrorAction SilentlyContinue
-		}
-	}
+            #Publish the function app
+            Write-Verbose "Publishing Function App $FunctionAppName in Resource Group $ResourceGroupName"
+            $null = Publish-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
