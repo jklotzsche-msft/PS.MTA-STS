@@ -195,7 +195,7 @@ Select "App files" and replace the contents of "host.json", "profile.ps1" and "r
     },
     "extensionBundle": {
         "id": "Microsoft.Azure.Functions.ExtensionBundle",
-        "version": "[3.*, 4.0.0)"
+        "version": "[4.*, 5.0.0)"
     }
 }
 ```
