@@ -8,6 +8,15 @@ To update the module to the latest version, use the following command:
 Update-Module -Name PS.MTA-STS
 ```
 
+## Version 1.3.1
+
+The 1.3.1 release of the PS.MTA-STS module includes (but is not limited to) the following changes and improvements:
+
+- New-PSMTASTSFunctionAppDeployment set Storage Account to TLS1.2 - ([GitHub Issue #45](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/45)) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- Update-PSMTASTSFunctionAppFile updates Storage Account to TLS1.2 - ([GitHub Issue #45](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/45)) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- Remove-PSMTASTSFunctionAppDeployment removes FunctionApp, Storage Account and App Service Plan - ([GitHub Issue #41](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/41)) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- ToDo: Resolve-PSMTASTSDnsName.ps1 upated to DNS over HTTPS - ([GitHub Issue #40](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/40))
+
 ## Version 1.3.0
 
 The 1.3.0 release of the PS.MTA-STS module includes (but is not limited to) the following changes and improvements:

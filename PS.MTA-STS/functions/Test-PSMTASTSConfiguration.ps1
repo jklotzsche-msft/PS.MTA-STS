@@ -227,7 +227,7 @@ max_age: 604800
             Write-Verbose "...checking MTA-STS Policy file at $mtaStsUri"
             
             try {
-                $mtaStsPolicyResponse = Invoke-WebRequest -Uri $mtaStsUri -TimeoutSec 20 -ErrorAction Stop
+                $mtaStsPolicyResponse = Invoke-WebRequest -UseBasicParsing -Uri $mtaStsUri -TimeoutSec 20 -ErrorAction Stop
                 $resultObject.MTA_STS_PolicyContent = ($mtaStsPolicyResponse.Content).Trim()
             }
             catch {

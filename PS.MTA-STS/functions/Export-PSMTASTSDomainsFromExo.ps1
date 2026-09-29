@@ -182,7 +182,7 @@
             Write-Verbose "...checking MTA-STS Policy file at $mtaStsUri"
             try {
                 # Try to get the MTA-STS Policy file
-                $mtaStsPolicyResponse = Invoke-WebRequest -Uri $mtaStsUri -TimeoutSec 20 -ErrorAction Stop
+                $mtaStsPolicyResponse = Invoke-WebRequest -UseBasicParsing -Uri $mtaStsUri -TimeoutSec 20 -ErrorAction Stop
                 $resultObject.MTA_STS_Policy = ($mtaStsPolicyResponse.Content).Trim() #.Replace("`r`n","")
             }
             catch {

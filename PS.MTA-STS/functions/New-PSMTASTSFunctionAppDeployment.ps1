@@ -255,6 +255,8 @@
                 SkuName                = 'Standard_LRS'
                 AllowBlobPublicAccess  = $false
                 EnableHttpsTrafficOnly = $true
+                MinimumTlsVersion      = "TLS1_2"
+                EnableSftp             = $false
             }
             if ($PSCmdlet.ShouldProcess("Storage Account $StorageAccountName", "Create")) {
                 $null = New-AzStorageAccount @newAzStorageAccountProps
