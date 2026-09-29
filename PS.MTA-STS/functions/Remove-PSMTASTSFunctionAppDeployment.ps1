@@ -90,7 +90,7 @@ function Remove-PSMTASTSFunctionAppDeployment {
 		}
 
 		$FunctionApp = Get-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
-		If ($FunctionApp -eq $null) {
+		If ($null -eq $FunctionApp) {
 			Write-Verbose "Function App $FunctionAppName not found. Nothing to remove."
 			return
 		} else{
@@ -103,7 +103,7 @@ function Remove-PSMTASTSFunctionAppDeployment {
 			#Get Storage Account
 			$FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
 			$StorageAccountName = $FunctionAppSetting.WEBSITE_CONTENTAZUREFILECONNECTIONSTRING.split(";")[1].Replace("AccountName=", "")
-			$StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -ErrorAction SilentlyContinue
+			#$StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -ErrorAction SilentlyContinue
 
 			#Delete Function App
 			Write-Verbose "Deleting Function App $FunctionAppName in Resource Group $ResourceGroupName"

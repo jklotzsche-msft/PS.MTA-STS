@@ -74,7 +74,7 @@ function Update-PSMTASTSFunctionAppFile {
         }
 
         $FunctionApp = Get-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
-        If ($FunctionApp -eq $null) {
+        If ($null -eq $FunctionApp) {
             Write-Verbose "Function App $FunctionAppName not found. Nothing to remove."
             return
         } else{
@@ -107,7 +107,7 @@ function Update-PSMTASTSFunctionAppFile {
     process {
         #Get the functions of a Function App
         $FunctionApp = Get-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
-        If ($FunctionApp -eq $null) {
+        If ($null -eq $FunctionApp) {
             Write-Verbose "Function App $FunctionAppName not found. Nothing to remove."
             return
         } else{
