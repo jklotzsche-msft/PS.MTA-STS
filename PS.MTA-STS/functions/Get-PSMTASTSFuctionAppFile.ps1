@@ -1,4 +1,4 @@
-## Experimental Function
+﻿## Experimental Function
 
 function Update-PSMTASTSFunctionAppFile {
     <#

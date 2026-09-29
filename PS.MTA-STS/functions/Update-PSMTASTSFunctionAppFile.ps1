@@ -7,7 +7,7 @@
         Publishes Azure Function App files and functions to Azure Function App.
         The Azure Function App will be updated with the latest PowerShell code.
         This will overwrite any changes you may have made to the Azure Function App!
-        
+
     .PARAMETER ResourceGroupName
         Provide the name of the Azure resource group, where the Azure Function App should be updated.
     
@@ -30,16 +30,16 @@
 
     .PARAMETER Confirm
         If this switch is provided, you will be asked for confirmation before any changes are made.
-        
+
     .EXAMPLE
         Update-PSMTASTSFunctionAppFile -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS' -PolicyMode 'Testing'
-        
+
         Updates the Azure Function App with the name 'PSMTASTS' in the resource group 'PSMTASTS' with policy mode 'Testing'.
         This will overwrite any changes you made to the Azure Function App!
 
     .EXAMPLE
         Update-PSMTASTSFunctionAppFile -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS' -PolicyMode 'Enforce' -ExoHostName '*.abcd-v1.mx.microsoft', 'mail.fabrikam.com'
-        
+
         Updates the Azure Function App with the name 'PSMTASTS' in the resource group 'PSMTASTS' with policy mode 'Enforce'.
         Additionally, it adds the MX record '*.abcd-v1.mx.microsoft' and 'mail.fabrikam.com' to the MTA-STS policy.
         The MTA-STS policy file will look like this:
@@ -59,18 +59,10 @@
     #region Parameter
     [CmdletBinding(SupportsShouldProcess = $true)]
     Param (
-        [Parameter(Mandatory = $true)]
-        [String]
-        $ResourceGroupName,
-
-        [Parameter(Mandatory = $true)]
-        [String]
-        $FunctionAppName,
-
+        [Parameter(Mandatory = $true)][String]$ResourceGroupName,
+        [Parameter(Mandatory = $true)][String]$FunctionAppName,
         [ValidateSet("Enforce", "Testing", "None")] # ValidateSet is used to limit the possible values
-        [String]
-        $PolicyMode = "Enforce",
-
+        [String]$PolicyMode = "Enforce",
         [ValidateScript({
                 # the provided list of hostnames must be valid, which means that they must be valid domain names
                 # Domain Names cannot start with a dot, so we need to check for that
@@ -115,7 +107,7 @@
             $null = Connect-AzAccount
         }
     }
-    
+
     process {
         # Create, if resource group doesn't exist already. If it doesn't exist, create it.
         Write-Verbose "Checking if ResourceGroup '$ResourceGroupName' already exists"
@@ -191,7 +183,7 @@
         $FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
         $StorageAccountName = $FunctionAppSetting.WEBSITE_CONTENTAZUREFILECONNECTIONSTRING.split(";")[1].Replace("AccountName=", "")
         $StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -ErrorAction SilentlyContinue
-        If ($Null -ne $StorageAccount) 
+        If ($Null -ne $StorageAccount)
         {
             $Null = Set-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -MinimumTlsVersion "TLS1_2" -ErrorAction SilentlyContinue
         }

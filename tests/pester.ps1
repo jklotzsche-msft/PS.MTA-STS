@@ -1,19 +1,14 @@
 ﻿param (
     $TestGeneral = $true,
-    
     $TestFunctions = $true,
-    
     [ValidateSet('None', 'Normal', 'Detailed', 'Diagnostic')]
     [Alias('Show')]
     $Output = "None",
-    
     $Include = "*",
-    
     $Exclude = ""
 )
 
 Write-Host "Starting Tests"
-
 Write-Host "Importing Module"
 
 $global:testroot = $PSScriptRoot
@@ -24,7 +19,7 @@ Import-Module "$PSScriptRoot\..\PS.MTA-STS\PS.MTA-STS.psd1"
 Import-Module "$PSScriptRoot\..\PS.MTA-STS\PS.MTA-STS.psm1" -Force
 
 # Need to import explicitly so we can use the configuration class
-Import-Module Pester
+Import-Module Pester -MinimumVersion 6.2.0
 
 Write-Host  "Creating test result folder"
 $null = New-Item -Path "$PSScriptRoot\.." -Name TestResults -ItemType Directory -Force
@@ -34,7 +29,12 @@ $totalRun = 0
 
 $testresults = @()
 $config = [PesterConfiguration]::Default
+$config.Run.Path = $PSScriptRoot
+$config.Output.Verbosity = 'Detailed'
 $config.TestResult.Enabled = $true
+$config.TestResult.OutputPath = "$PSScriptRoot\..\TestResults\TEST-results.xml"
+
+Invoke-Pester -Configuration $config
 
 #region Run General Tests
 if ($TestGeneral)

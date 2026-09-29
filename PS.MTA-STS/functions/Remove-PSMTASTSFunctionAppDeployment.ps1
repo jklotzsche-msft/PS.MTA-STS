@@ -1,4 +1,4 @@
-function Remove-PSMTASTSFunctionAppDeployment {
+﻿function Remove-PSMTASTSFunctionAppDeployment {
     <#
     .SYNOPSIS
         Removes the Azure Function App with the needed PowerShell code to publish MTA-STS policies.
@@ -24,12 +24,18 @@ function Remove-PSMTASTSFunctionAppDeployment {
         Provide the name of the Azure Storage Account, which should be created.
         If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
 
-    .PARAMETER PlanName
-        Provide the name of the Azure App Service Plan, which should be created.
-        If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
+    .PARAMETER Confirm
+    Prompts you for confirmation before running the cmdlet.
 
-        If the PlanName is provided, the location will be set to the location of the App Service Plan.
-        The location will still be used to create the resource group.
+    .PARAMETER WhatIf
+    Shows what would happen if the cmdlet runs. The cmdlet does not run.
+
+    .PARAMETER PlanName
+    Provide the name of the Azure App Service Plan, which should be created.
+    If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
+
+    If the PlanName is provided, the location will be set to the location of the App Service Plan.
+    The location will still be used to create the resource group.
 
     .EXAMPLE
         New-PSMTASTSFunctionAppDeployment -Location 'West Europe' -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS' -StorageAccountName 'stpsmtasts'
@@ -54,8 +60,7 @@ function Remove-PSMTASTSFunctionAppDeployment {
                     $true
                 }
             })]
-        [String]
-        $ResourceGroupName,
+        [String]$ResourceGroupName,
 
         [Parameter(Mandatory = $true)]
         [ValidateScript({
@@ -66,8 +71,7 @@ function Remove-PSMTASTSFunctionAppDeployment {
                     $true
                 }
             })]
-        [String]
-        $FunctionAppName,
+        [String]$FunctionAppName,
 
         [Parameter(Mandatory = $true)]
         [ValidateScript({
@@ -78,47 +82,46 @@ function Remove-PSMTASTSFunctionAppDeployment {
                     $true
                 }
             })]
-        [String]
-        $StorageAccountName
+        [String]$StorageAccountName
     )
     #endregion Parameter
 
     begin {
         # Trap errors
-		trap {
-			throw $_
-		}
+        trap {
+            throw $_
+        }
 
-		$FunctionApp = Get-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
-		If ($null -eq $FunctionApp) {
-			Write-Verbose "Function App $FunctionAppName not found. Nothing to remove."
-			return
-		} else{
-			#Getting App Service Plan
-			$AppServicePlan = $FunctionApp.AppServicePlan
+        $FunctionApp = Get-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+        If ($null -eq $FunctionApp) {
+            Write-Verbose "Function App $FunctionAppName not found. Nothing to remove."
+            return
+        } else{
+            #Getting App Service Plan
+            $AppServicePlan = $FunctionApp.AppServicePlan
 
-			#Get Function AppSetting for Storage Account
-        	$FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
-		
-			#Get Storage Account
-			$FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
-			$StorageAccountName = $FunctionAppSetting.WEBSITE_CONTENTAZUREFILECONNECTIONSTRING.split(";")[1].Replace("AccountName=", "")
-			#$StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -ErrorAction SilentlyContinue
+            #Get Function AppSetting for Storage Account
+            $FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+        
+            #Get Storage Account
+            $FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+            $StorageAccountName = $FunctionAppSetting.WEBSITE_CONTENTAZUREFILECONNECTIONSTRING.split(";")[1].Replace("AccountName=", "")
+            #$StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -ErrorAction SilentlyContinue
 
-			#Delete Function App
-			Write-Verbose "Deleting Function App $FunctionAppName in Resource Group $ResourceGroupName"
-			$null = Remove-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -Force -ErrorAction SilentlyContinue
+            #Delete Function App
+            Write-Verbose "Deleting Function App $FunctionAppName in Resource Group $ResourceGroupName"
+            $null = Remove-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -Force -ErrorAction SilentlyContinue
 
-			#Delete Storage Account
-			Write-Verbose "Deleting Storage Account $StorageAccountName in Resource Group $ResourceGroupName"
-			$null = Remove-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -Force -ErrorAction SilentlyContinue
+            #Delete Storage Account
+            Write-Verbose "Deleting Storage Account $StorageAccountName in Resource Group $ResourceGroupName"
+            $null = Remove-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -Force -ErrorAction SilentlyContinue
 
-			#Delete App Service Plan
-			Write-Verbose "Deleting App Service Plan $AppServicePlan in Resource Group $ResourceGroupName"
-			$null = Remove-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $AppServicePlan -Force -ErrorAction SilentlyContinue
-		}
-	}
+            #Delete App Service Plan
+            Write-Verbose "Deleting App Service Plan $AppServicePlan in Resource Group $ResourceGroupName"
+            $null = Remove-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $AppServicePlan -Force -ErrorAction SilentlyContinue
+        }
+    }
 
-	process {
-	}
+    process {
+    }
 }
