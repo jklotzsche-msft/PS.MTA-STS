@@ -151,7 +151,7 @@ On the new page, enter the following information (as described at step 4 of [Enh
   - Resource group: Select the resource group you created in the previous step
   - Function App Name: func-MTA-STS (or any other name you like and complies with the naming rules)
   - Runtime stack: PowerShell Core
-  - Version: 7.4
+  - Version: 7.6
   - Region: Select the same region as you selected for the resource group
   - Operating System: Windows
   - Hosting options and plans: Consumption (Serverless)

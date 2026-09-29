@@ -279,7 +279,7 @@
             StorageAccountName = $StorageAccountName
             FunctionsVersion   = '4'
             OSType             = 'Windows'
-            RuntimeVersion     = '7.4'
+            RuntimeVersion     = '7.6'
         }
         # If PlanName is provided, you cannot set the Location anymore.
         # Therefore, we set the PlanName and don't set the Location, if PlanName is provided.
