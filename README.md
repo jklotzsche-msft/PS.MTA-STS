@@ -2,7 +2,7 @@
 
 PowerShell-Mail Transfer Agent-Strict Transport Security | Enhancing mail flow by deploying and testing MTA-STS for Exchange Online using this PowerShell module.
 
-<img alt="Logo - E-Mail flying around planet earth. This is the logo for this project." src="./docs/_images/PS.MTA-STS-Logo.jpg" width="200" />
+![Logo - E-Mail flying around planet earth. This is the logo for this project.](./docs/_images/PS.MTA-STS-Logo.jpg)
 
 This module is for you, if you ...
 

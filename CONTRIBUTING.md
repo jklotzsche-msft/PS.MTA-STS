@@ -1,29 +1,61 @@
-# How to contribute to M365PSProfile
+# Contributing to PS.MTA-STS
 
-## **Did you find a bug?** :bug:
+Thanks for considering a contribution to PS.MTA-STS. We appreciate your time and effort to improve the project.
 
-* **Ensure the bug was not already reported** by searching on GitHub under [Issues](https://github.com/jklotzsche-msft/PS.MTA-STS/issues).
+## Reporting bugs
 
-* If you're unable to find an open issue addressing the problem, [open a new one](hhttps://github.com/jklotzsche-msft/PS.MTA-STS/issues/new). Be sure to include a **title and clear description** (as much relevant information as possible).
+Before opening a new issue:
 
-## **Did you write a patch that fixes a bug? Did you add a new feature or updated an existing one?** :gear:
+- Check the existing issues to make sure the problem has not already been reported.
+- Review the open and closed issues in the repository.
+- If you find no existing issue, open a new one and include as much detail as possible.
 
-* Create a [new fork](https://github.com/jklotzsche-msft/PS.MTA-STS/fork) with all branches.
+When reporting a bug, please include:
 
-* Create a new branch based on the develop branch in the forked repository, where you implement your changes.
+- a clear title
+- a description of the problem
+- steps to reproduce
+- expected behavior
+- actual behavior
+- relevant PowerShell version and OS
+- any error messages or screenshots
 
-* Open a new pull request from the new branch to the develop branch of the original repository (all changes for the next release are added to the develop branch).
+Open a new issue here:
+https://github.com/jklotzsche-msft/PS.MTA-STS/issues/new
 
-* Ensure the PR description clearly describes the problem and solution.
+## Contributing changes
 
-## **Did you fix whitespace, format code, or make a purely cosmetic patch?** :ring:
+If you want to fix a bug, add a feature, or improve existing functionality:
 
-Changes that are cosmetic in nature and do not add anything substantial to the stability or functionality will generally not be accepted.
+1. Fork the repository.
+2. Create a new branch from the develop branch in your fork.
+3. Make your changes in that branch.
+4. Validate your changes locally.
+5. Open a pull request back to the original repository’s develop branch.
 
-## **Do you have questions about the source code?** :phone:
+Please make sure your PR description clearly explains:
 
-* If you have any questions about using M365PSProfile, please contact the creators of the module directly: [Andres Bohren](https://github.com/BohrenAn) or [Jamy Klotzsche](https://github.com/jklotzsche-msft)
+- the problem being solved
+- the change you made
+- why the change is needed
+- any validation or testing performed
 
-Thanks! :heart:
+## Development guidelines
 
-PS.MTA-STS Team
+- Keep changes focused and limited to the task at hand.
+- Follow the existing PowerShell coding style and conventions in the project.
+- Include or update documentation when behavior changes.
+- Avoid unrelated formatting or whitespace-only changes unless they are necessary.
+
+## Cosmetic or minor changes
+
+Changes that are purely cosmetic, such as whitespace or formatting-only edits, are generally not accepted unless they are required as part of a functional update.
+
+## Questions
+
+If you have questions about using or contributing to PS.MTA-STS, please contact the project maintainers:
+
+- [Andres Bohren](https://github.com/BohrenAn)
+- [Jamy Klotzsche](https://github.com/jklotzsche-msft)
+
+Thank you for helping improve PS.MTA-STS
