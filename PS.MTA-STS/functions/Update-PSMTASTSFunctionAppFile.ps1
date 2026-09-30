@@ -171,7 +171,32 @@
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update")) {
             $null = Publish-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -ArchivePath "$workingDirectory/Function.zip" -Confirm:$false -Force
         }
-        
+
+        # Set FTP disabled
+        Write-Verbose "Disabling FTP for Azure Function App $($FunctionAppName)..."
+        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update runtime/security settings")) {
+            $null = Set-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -FtpsState Disabled
+        }
+
+        <# This Part does not work yet
+        # Set TLS  Version 1.3
+        Write-Verbose "Setting TLS Version to 1.3 / PowerShell Version to 7.6"
+        $body = @{
+            properties = @{
+                minTlsVersion    = "1.3"
+                scmMinTlsVersion = "1.3"
+                powerShellVersion = '7.6'
+            }
+        } | ConvertTo-Json -Depth 3
+
+        $Path = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Web/sites/$FunctionAppName/config/web`?api-version=2024-04-01"
+        $Null = Invoke-AzRestMethod -Method PATCH -Path $Path -Payload $body
+
+        # Set Runtime PowerShell 7.6 + 
+        #Write-Verbose "Setting Runtime PowerShell Version to 7.6"
+        #Update-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -PowerShellVersion "7.6"
+        #>
+
         # Clean up
         Write-Verbose "Cleanup Temp Folder"
         if (Test-Path -Path $workingDirectory) {
@@ -181,11 +206,33 @@
         #Upate Strage Account to TLS 1.2
         Write-Verbose "Update Storage Account to TLS 1.2"
         $FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
-        $StorageAccountName = $FunctionAppSetting.WEBSITE_CONTENTAZUREFILECONNECTIONSTRING.split(";")[1].Replace("AccountName=", "")
-        $StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -ErrorAction SilentlyContinue
-        If ($Null -ne $StorageAccount)
-        {
-            $Null = Set-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -MinimumTlsVersion "TLS1_2" -ErrorAction SilentlyContinue
+        
+        $StorageAccountName = $null
+        $contentConn = $FunctionAppSetting["WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"]
+        
+        if (-not [string]::IsNullOrWhiteSpace($contentConn) -and $contentConn -match "(^|;)AccountName=([^;]+)") {
+            $StorageAccountName = $matches[2]
+        }
+        
+        if (-not $StorageAccountName) {
+            $jobsConn = $FunctionAppSetting["AzureWebJobsStorage"]
+            if (-not [string]::IsNullOrWhiteSpace($jobsConn) -and $jobsConn -match "(^|;)AccountName=([^;]+)") {
+                $StorageAccountName = $matches[2]
+            }
+        }
+        
+        if (-not $StorageAccountName) {
+            $StorageAccountName = $FunctionAppSetting["AzureWebJobsStorage__accountName"]
+        }
+        
+        if ($StorageAccountName) {
+            $StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -ErrorAction SilentlyContinue
+            if ($null -ne $StorageAccount) {
+                $null = Set-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -MinimumTlsVersion "TLS1_2" -ErrorAction SilentlyContinue
+            }
+        }
+        else {
+            Write-Warning "Could not determine the storage account name from Function App settings. TLS update skipped."
         }
     }
 }
