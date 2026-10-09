@@ -178,24 +178,21 @@
             $null = Set-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -FtpsState Disabled
         }
 
-        <# This Part does not work yet
-        # Set TLS  Version 1.3
+        # Set TLS Version 1.3 and PowerShell Version 7.6
         Write-Verbose "Setting TLS Version to 1.3 / PowerShell Version to 7.6"
-        $body = @{
-            properties = @{
-                minTlsVersion    = "1.3"
-                scmMinTlsVersion = "1.3"
-                powerShellVersion = '7.6'
-            }
-        } | ConvertTo-Json -Depth 3
+        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update TLS 1.3 and PowerShell 7.6")) {
+            $subscriptionId = (Get-AzContext).Subscription.Id
+            $body = @{
+                properties = @{
+                    minTlsVersion     = "1.3"
+                    scmMinTlsVersion  = "1.3"
+                    powerShellVersion = "7.6"
+                }
+            } | ConvertTo-Json -Depth 3
 
-        $Path = "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Web/sites/$FunctionAppName/config/web`?api-version=2024-04-01"
-        $Null = Invoke-AzRestMethod -Method PATCH -Path $Path -Payload $body
-
-        # Set Runtime PowerShell 7.6 + 
-        #Write-Verbose "Setting Runtime PowerShell Version to 7.6"
-        #Update-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -PowerShellVersion "7.6"
-        #>
+            $path = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Web/sites/$FunctionAppName/config/web?api-version=2026-07-15"
+            $null = Invoke-AzRestMethod -Method PATCH -Path $path -Payload $body
+        }
 
         # Clean up
         Write-Verbose "Cleanup Temp Folder"

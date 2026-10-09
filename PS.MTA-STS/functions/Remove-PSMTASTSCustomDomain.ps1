@@ -162,7 +162,7 @@
             if ($subjectName -in $removeCustomDomains) {
                 #Get Thumbprint of Certificate
                 $thumbprint = $certificate.Thumbprint
-				
+
                 #Remove Managed Certificate
                 Write-Verbose "Remove Managed Certificate: $subjectName Thumbprint: $thumbprint"
                 if ($PSCmdlet.ShouldProcess("Subject: $subjectName, Thumbprint: $thumbprint", "Remove managed certificate")) {

@@ -305,6 +305,27 @@
         Write-Verbose "Waiting for Azure Function App $FunctionAppName to be ready..."
         $null = Start-Sleep -Seconds 60
 
+        # Set FTP disabled
+        Write-Verbose "Disabling FTP for Azure Function App $($FunctionAppName)..."
+        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update runtime/security settings")) {
+            $null = Set-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -FtpsState Disabled
+        }
+
+        # Set TLS Version 1.3 and PowerShell Version 7.6
+        Write-Verbose "Setting TLS Version to 1.3 / PowerShell Version to 7.6"
+        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update TLS 1.3 and PowerShell 7.6")) {
+            $subscriptionId = (Get-AzContext).Subscription.Id
+            $body = @{
+                properties = @{
+                    minTlsVersion     = "1.3"
+                    scmMinTlsVersion  = "1.3"
+                }
+            } | ConvertTo-Json -Depth 3
+
+            $path = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Web/sites/$FunctionAppName/config/web?api-version=2026-07-15"
+            $null = Invoke-AzRestMethod -Method PATCH -Path $path -Payload $body
+        }
+
         # Remove AzureWebJobsDashboard, as it is deprecated
         $functionAppSettingsToRemove = @("AzureWebJobsDashboard")
         $FunctionAppSettings = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName
