@@ -19,6 +19,7 @@ The 1.4.0 release of the PS.MTA-STS module includes (but is not limited to) the 
 - ToDo: Resolve-PSMTASTSDnsName.ps1 upated to DNS over HTTPS - ([GitHub Issue #40](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/40))
 - Updated tp Pester 6.2.0
 - New-PSMTASTSFunctionAppDeployment Disabled ApplicationInsights by default but can be enabled with -EnableApplicationInsights
+- Added a Telemetry Function
 
 ## Version 1.3.1
 

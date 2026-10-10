@@ -177,8 +177,6 @@
             $null = Connect-AzAccount
         }
 
-        Write-Host "Creation takes a few Minutes... Please wait."
-
         # Store the current culture for later restoration
         $CurrentCulture = [System.Threading.Thread]::CurrentThread.CurrentCulture
         [System.Threading.Thread]::CurrentThread.CurrentCulture = 'en-US'

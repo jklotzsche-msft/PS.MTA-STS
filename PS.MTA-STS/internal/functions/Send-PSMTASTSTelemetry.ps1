@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Sends a telemetry event to a configured HTTP endpoint without interrupting the main workflow.
 
@@ -10,27 +10,34 @@
 .PARAMETER TelemetryEndpoint
     The full URL of the telemetry receiver endpoint.
 
-.PARAMETER Payload
-    A hashtable containing the structured event data to send, such as eventType, domain, result, resourceGroup, and timestamp.
+
+.PARAMETER EventType
+    The type of the telemetry event, e.g., "AddDomain" or "RemoveDomain".
+
+    .PARAMETER Domain
+    The domain name associated with the telemetry event.
+
+.PARAMETER TenantId
+    The tenant ID associated with the telemetry event.
 
 .EXAMPLE
-    Send-PSMTASTSTelemetry -TelemetryEndpoint 'https://telemetry.example.azurewebsites.net/telemetry' -Payload @{
-        eventType = 'AddDomain'
-        domain = 'contoso.com'
-        tenantid = (Get-AzContext).Tenant.Id
-        PolicyMode = $PolicyMode
-    }
+    Send-PSMTASTSTelemetry -TelemetryEndpoint "https://telemetry.example.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain "contoso.com" -TenantId (Get-AzContext).Tenant.Id
+
+    Sends a telemetry event for the added domain contoso.com.
 
 .NOTES
     Best practice: use UTC timestamps, never throw from telemetry calls, and keep the payload lean so operational failures are not masked by monitoring issues.
+
+.LINK
+    https://github.com/jklotzsche-msft/PS.MTA-STS
+
 #>
 function Send-PSMTASTSTelemetry {
     param(
         [string]$TelemetryEndpoint,  # URL of the receiver Function
         [string][validateSet("AddDomain","RemoveDomain")]$EventType,
         [string]$Domain,
-        [string]$TenantId,
-        [string]$PolicyMode
+        [string]$TenantId
     )
 
     # Construct the payload for the telemetry event

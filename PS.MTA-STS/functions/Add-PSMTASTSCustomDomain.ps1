@@ -211,7 +211,7 @@
             }
             if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Add certificate for $newCustomDomainToAdd")) {
                 $null = New-AzWebAppCertificate @newAzWebAppCertificate -WarningAction SilentlyContinue
-            }        
+            }
         }
 
         # Send telemetry event for added custom domains
