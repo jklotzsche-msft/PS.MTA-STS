@@ -30,9 +30,9 @@
     .PARAMETER RegisterResourceProvider
         Use this Parameter to Register Resource Provider 'Microsoft.Web' if it is not yet registered.
 
-    .PARAMETER DisableApplicationInsights
-        By default, Application Insights is enabled during the creation of the Azure Function App.
-        Use this parameter to disable the creation of the application insights resource during the function app creation. No logs will be available then.
+    .PARAMETER EnableApplicationInsights
+        By default, Application Insights is disabled during the creation of the Azure Function App.
+        Use this parameter to enable or disable the creation of the application insights resource during the function app creation. No logs will be available if it is disabled.
 
     .PARAMETER StorageAccountName
         Provide the name of the Azure Storage Account, which should be created.
@@ -176,6 +176,12 @@
             Write-Verbose "Connecting to Azure service..."
             $null = Connect-AzAccount
         }
+
+        Write-Host "Creation takes a few Minutes... Please wait."
+
+        # Store the current culture for later restoration
+        $CurrentCulture = [System.Threading.Thread]::CurrentThread.CurrentCulture
+        [System.Threading.Thread]::CurrentThread.CurrentCulture = 'en-US'
     }
     
     process {
@@ -270,6 +276,7 @@
         }
         catch {
             Write-Warning "Could not enable soft delete for blobs in Storage Account $StorageAccountName. Please enable it manually, if needed."
+            [System.Threading.Thread]::CurrentThread.CurrentCulture = $CurrentCulture
         }
 
         # Create Function App
@@ -293,9 +300,12 @@
             $newAzFunctionAppProps.Location = $Location
         }
         # Disable Application Insights, if provided
-        if ($DisableApplicationInsights) {
+        if ($EnableApplicationInsights) {
+            $newAzFunctionAppProps.DisableApplicationInsights = $false
+        } else {
             $newAzFunctionAppProps.DisableApplicationInsights = $true
         }
+
         # Create Function App
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Create")) {
             $null = New-AzFunctionApp @newAzFunctionAppProps
@@ -348,5 +358,8 @@
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update")) {
             $null = Update-PSMTASTSFunctionAppFile @updateFunctionAppProps
         }
+
+        # Restore the original culture for the current thread
+        [System.Threading.Thread]::CurrentThread.CurrentCulture = $CurrentCulture
     }
 }

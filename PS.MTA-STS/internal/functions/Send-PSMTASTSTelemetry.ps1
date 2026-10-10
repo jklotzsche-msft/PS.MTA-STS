@@ -15,7 +15,7 @@
 
 .EXAMPLE
     Send-PSMTASTSTelemetry -TelemetryEndpoint 'https://telemetry.example.azurewebsites.net/telemetry' -Payload @{
-        eventType = 'DomainAdded'
+        eventType = 'AddDomain'
         domain = 'contoso.com'
         tenantid = (Get-AzContext).Tenant.Id
         PolicyMode = $PolicyMode
@@ -27,9 +27,22 @@
 function Send-PSMTASTSTelemetry {
     param(
         [string]$TelemetryEndpoint,  # URL of the receiver Function
-        [hashtable]$Payload
+        [string][validateSet("AddDomain","RemoveDomain")]$EventType,
+        [string]$Domain,
+        [string]$TenantId,
+        [string]$PolicyMode
     )
+
+    # Construct the payload for the telemetry event
+    $Payload = @{
+        eventType = $EventType
+        domain = $Domain
+        tenantId = $TenantId
+        policyMode = $PolicyMode
+    }
     $body = $Payload | ConvertTo-Json -Depth 3 -Compress
+
+    # Send the telemetry event to the configured endpoint
     $null = Invoke-RestMethod -Uri $TelemetryEndpoint -Method POST `
         -Headers @{ "Content-Type" = "application/json" } `
         -Body $body `

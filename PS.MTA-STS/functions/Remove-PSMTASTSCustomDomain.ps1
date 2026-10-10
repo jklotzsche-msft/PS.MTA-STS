@@ -172,5 +172,8 @@
                 }
             }
         }
+
+        # Send telemetry event for removed custom domains
+        Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "RemoveDomain" -Domain $removeCustomDomains -TenantId (Get-AzContext).Tenant.Id
     }
 }

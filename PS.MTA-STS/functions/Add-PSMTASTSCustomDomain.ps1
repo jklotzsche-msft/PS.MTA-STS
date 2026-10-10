@@ -211,7 +211,10 @@
             }
             if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Add certificate for $newCustomDomainToAdd")) {
                 $null = New-AzWebAppCertificate @newAzWebAppCertificate -WarningAction SilentlyContinue
-            }
+            }        
         }
+
+        # Send telemetry event for added custom domains
+        Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain $removeCustomDomains -TenantId (Get-AzContext).Tenant.Id
     }
 }

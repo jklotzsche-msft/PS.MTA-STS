@@ -104,9 +104,7 @@
             $FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
         
             #Get Storage Account
-            $FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
             $StorageAccountName = $FunctionAppSetting.WEBSITE_CONTENTAZUREFILECONNECTIONSTRING.split(";")[1].Replace("AccountName=", "")
-            #$StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -ErrorAction SilentlyContinue
 
             #Delete Function App
             Write-Verbose "Deleting Function App $FunctionAppName in Resource Group $ResourceGroupName"
@@ -119,6 +117,11 @@
             #Delete App Service Plan
             Write-Verbose "Deleting App Service Plan $AppServicePlan in Resource Group $ResourceGroupName"
             $null = Remove-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $AppServicePlan -Force -ErrorAction SilentlyContinue
+
+            # Delete Application Insights
+
+            # Delete Smart detector alert rule
+
         }
     }
 
