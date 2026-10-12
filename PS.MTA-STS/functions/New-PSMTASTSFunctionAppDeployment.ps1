@@ -263,13 +263,13 @@
                 EnableSftp             = $false
             }
             if ($PSCmdlet.ShouldProcess("Storage Account $StorageAccountName", "Create")) {
-                $null = New-AzStorageAccount @newAzStorageAccountProps
+                $null = New-AzStorageAccount @newAzStorageAccountProps -WarningAction SilentlyContinue
             }
         }
 
         # Enable soft delete for blobs
         try {
-            $ctx = New-AzStorageContext -StorageAccountName $StorageAccountName
+            $ctx = New-AzStorageContext -StorageAccountName $StorageAccountName -WarningAction SilentlyContinue
             $null = Enable-AzStorageDeleteRetentionPolicy -RetentionDays $StorageDeleteRetentionInDays -Context $ctx
         }
         catch {
@@ -306,7 +306,7 @@
 
         # Create Function App
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Create")) {
-            $null = New-AzFunctionApp @newAzFunctionAppProps
+            $null = New-AzFunctionApp @newAzFunctionAppProps -WarningAction SilentlyContinue
         }
 
         # Wait for Function App to be ready
@@ -316,22 +316,22 @@
         # Set FTP disabled
         Write-Verbose "Disabling FTP for Azure Function App $($FunctionAppName)..."
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update runtime/security settings")) {
-            $null = Set-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -FtpsState Disabled
+            $null = Set-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -FtpsState Disabled -WarningAction SilentlyContinue
         }
 
-        # Set TLS Version 1.3 and PowerShell Version 7.6
-        Write-Verbose "Setting TLS Version to 1.3 / PowerShell Version to 7.6"
-        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update TLS 1.3 and PowerShell 7.6")) {
+        # Set TLS Version 1.2 and PowerShell Version 7.6
+        Write-Verbose "Setting TLS Version to 1.2 / PowerShell Version to 7.6"
+        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update TLS 1.2 and PowerShell 7.6")) {
             $subscriptionId = (Get-AzContext).Subscription.Id
             $body = @{
                 properties = @{
-                    minTlsVersion     = "1.3"
-                    scmMinTlsVersion  = "1.3"
+                    minTlsVersion     = "1.2"
+                    scmMinTlsVersion  = "1.2"
                 }
             } | ConvertTo-Json -Depth 3
 
             $path = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Web/sites/$FunctionAppName/config/web?api-version=2026-07-15"
-            $null = Invoke-AzRestMethod -Method PATCH -Path $path -Payload $body
+            $null = Invoke-AzRestMethod -Method PATCH -Path $path -Payload $body -WarningAction SilentlyContinue
         }
 
         # Remove AzureWebJobsDashboard, as it is deprecated
@@ -340,7 +340,7 @@
         foreach ($functionAppSettingToRemove in $functionAppSettingsToRemove) {
             if ($FunctionAppSettings.Keys -contains $functionAppSettingToRemove) {
                 Write-Verbose "Remove $functionAppSettingToRemove App Setting from Function App $FunctionAppName..."
-                Remove-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -AppSettingName $functionAppSettingToRemove -Confirm:$false -Force
+                Remove-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -AppSettingName $functionAppSettingToRemove -Confirm:$false -Force -WarningAction SilentlyContinue
             }
         }
 

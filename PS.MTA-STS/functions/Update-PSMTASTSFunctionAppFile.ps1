@@ -175,17 +175,17 @@
         # Set FTP disabled
         Write-Verbose "Disabling FTP for Azure Function App $($FunctionAppName)..."
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update runtime/security settings")) {
-            $null = Set-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -FtpsState Disabled
+            $null = Set-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -FtpsState Disabled -WarningAction SilentlyContinue
         }
 
         # Set TLS Version 1.3 and PowerShell Version 7.6
-        Write-Verbose "Setting TLS Version to 1.3 / PowerShell Version to 7.6"
-        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update TLS 1.3 and PowerShell 7.6")) {
+        Write-Verbose "Setting TLS Version to 1.2 / PowerShell Version to 7.6"
+        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update TLS 1.2 and PowerShell 7.6")) {
             $subscriptionId = (Get-AzContext).Subscription.Id
             $body = @{
                 properties = @{
-                    minTlsVersion     = "1.3"
-                    scmMinTlsVersion  = "1.3"
+                    minTlsVersion     = "1.2"
+                    scmMinTlsVersion  = "1.2"
                     powerShellVersion = "7.6"
                 }
             } | ConvertTo-Json -Depth 3

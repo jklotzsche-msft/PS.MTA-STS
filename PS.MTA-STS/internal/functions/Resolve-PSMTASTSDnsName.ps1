@@ -15,6 +15,9 @@
         .PARAMETER Server
         DNS server to use for resolving the DNS record.
 
+        .PARAMETER UseClassicDNS
+        Switch to use the classic DNS resolution method with Resolve-DnsName. If not specified, the function will use the Google DNS over HTTPS method.
+
         .EXAMPLE
         Resolve-PSMTASTSDnsName -Name "example.com" -Type "TXT" -Server "8.8.8.8"
 
@@ -32,12 +35,21 @@
 
         [Parameter(Mandatory = $true)]
         [String]
-        $Server
+        $Server,
+
+        [Parameter(Mandatory = $false)]
+        [switch]
+        $UseClassicDNS = $false
     )
 
     Write-Verbose -Message "...checking $($Type.ToUpper()) record for $Name using DNS server $Server"
     try {
-        Resolve-DnsName -Name $Name -Type $Type -Server $Server -QuickTimeout -ErrorAction Stop
+        If ($UseClassicDNS) {
+            Resolve-DnsName -Name $Name -Type $Type -Server $Server -QuickTimeout -ErrorAction Stop
+        }
+        else {
+            Invoke-RestMethod -URI "https://dns.google/resolve?name=$Name&type=$Type"
+        }
     }
     catch {
         if($_.CategoryInfo.Category -eq "ResourceUnavailable") {

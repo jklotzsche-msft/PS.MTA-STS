@@ -33,6 +33,9 @@
         .PARAMETER DnsServer
         Provide a String containing the IP address of the DNS server, which should be used to query the MX record. Default is 8.8.8.8 (Google DNS).
 
+        .PARAMETER NoTelemetry
+        Switch to disable sending telemetry events.
+
         .PARAMETER WhatIf
         Switch to run the command in a WhatIf mode.
 
@@ -84,7 +87,9 @@
         $CsvDelimiter = ";",
 
         [String]
-        $DnsServer = "8.8.8.8"
+        $DnsServer = "8.8.8.8",
+
+        [switch]$NoTelemetry = $false
     )
     
     begin {
@@ -215,6 +220,11 @@
         }
 
         # Send telemetry event for added custom domains
-        Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain $removeCustomDomains -TenantId (Get-AzContext).Tenant.Id
+        if ($NoTelemetry -eq $false) {
+            Foreach ($DomainName in $domainList)
+            {
+                Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain $DomainName -TenantId (Get-AzContext).Tenant.Id
+            }
+        }
     }
 }

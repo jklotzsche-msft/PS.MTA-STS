@@ -24,6 +24,9 @@
         .PARAMETER CsvDelimiter
         Provide delimiter of csv file. Default is ";".
 
+        .PARAMETER NoTelemetry
+        Switch to disable sending telemetry events.
+
         .PARAMETER WhatIf
         Switch to run the command in a WhatIf mode.
 
@@ -67,7 +70,9 @@
 
         [Parameter(ParameterSetName = "Csv")]
         [string]
-        $CsvDelimiter = ";"
+        $CsvDelimiter = ";",
+
+        [Parameter()][switch]$NoTelemetry = $false
     )
     
     begin {
@@ -174,6 +179,11 @@
         }
 
         # Send telemetry event for removed custom domains
-        Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "RemoveDomain" -Domain $removeCustomDomains -TenantId (Get-AzContext).Tenant.Id
+        if ($NoTelemetry -eq $false) {
+            Foreach ($DomainName in $DomainList)
+            {
+                Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "RemoveDomain" -Domain $DomainName -TenantId (Get-AzContext).Tenant.Id
+            }
+        }
     }
 }
