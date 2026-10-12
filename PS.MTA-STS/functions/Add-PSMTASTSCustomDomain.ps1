@@ -33,6 +33,9 @@
         .PARAMETER DnsServer
         Provide a String containing the IP address of the DNS server, which should be used to query the MX record. Default is 8.8.8.8 (Google DNS).
 
+        .PARAMETER UseClassicDNS
+        Switch to use the classic DNS resolution method with Resolve-DnsName. If not specified, the function will use the Google DNS over HTTPS method.
+
         .PARAMETER NoTelemetry
         Switch to disable sending telemetry events.
 
@@ -72,9 +75,12 @@
         [Parameter(Mandatory = $true)]
         [string]
         $FunctionAppName,
+
+        [Parameter(Mandatory = $false)]
         [switch]
         $DoNotAddManagedCertificate,
 
+        [Parameter(Mandatory = $false)]
         [switch]
         $SkipCAACheck,
 
@@ -86,8 +92,13 @@
         [string]
         $CsvDelimiter = ";",
 
+        [Parameter(Mandatory = $false)]
         [String]
         $DnsServer = "8.8.8.8",
+
+        [Parameter(Mandatory = $false)]
+        [switch]
+        $UseClassicDNS = $false,
 
         [switch]$NoTelemetry = $false
     )
@@ -148,7 +159,13 @@
 
             #Check if mta-sts.domain.tld CNAME $FunctionAppName.azurewebsites.net exists
             $mtaStsDomain = "mta-sts." + $domain
-            $mtaStsCName = Resolve-PSMTASTSDnsName -Name $mtaStsDomain -Server $DnsServer -Type CNAME | Where-Object { $_.NameHost -like "*.azurewebsites.net" } | Select-Object -ExpandProperty NameHost
+            If ($UseClassicDNS -eq $true) {
+                $mtaStsCName = Resolve-PSMTASTSDnsName -Name $mtaStsDomain -Server $DnsServer -Type CNAME | Where-Object { $_.NameHost -like "*.azurewebsites.net" } | Select-Object -ExpandProperty NameHost
+            } else {
+                $mtaStsCName = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDomain&type=CNAME").Answer.data | Where-Object {$_ -like "*.azurewebsites.net."}
+                # Remove trailing dot from the CNAME record
+                $mtaStsCName = $mtaStsCName.Substring(0, $mtaStsCName.Length - 1)
+            }
 
             # Check, if CNAME record exists
             if ($Null -eq $mtaStsCName -or $mtaStsCName -ne "$FunctionAppName.azurewebsites.net") {

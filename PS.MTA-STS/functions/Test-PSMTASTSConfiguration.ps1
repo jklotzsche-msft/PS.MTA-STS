@@ -68,21 +68,31 @@
         [string[]]
         $DomainName,
 
+        [Parameter(Mandatory = $false)]
         [String]
         $DnsServer = "8.8.8.8",
 
+        [Parameter(Mandatory = $false)]
+        [Switch]
+        $UseClassicDNS,
+
+        [Parameter(Mandatory = $false)]
         [Bool]
         $DisplayResult = $true,
 
+        [Parameter(Mandatory = $false)]
         [Switch]
         $ExportResult,
-    
+
+        [Parameter(Mandatory = $false)]
         [String]
         $ResultPath = (Join-Path -Path $env:TEMP -ChildPath "$(Get-Date -Format yyyyMMddhhmmss)_mta-sts-test-result.csv"),
 
+        [Parameter(Mandatory = $false)]
         [string]
         $CsvEncoding = "UTF8",
 
+        [Parameter(Mandatory = $false)]
         [string]
         $CsvDelimiter = ";",
 
@@ -163,7 +173,11 @@ max_age: 604800
         foreach ($domain in $domainList) {
             Write-Verbose "Checking $counter / $($domainList.count) - $($domain)"
 
-            $CNameHost = Resolve-DnsName -Name "mta-sts.$Domain" -Type "CNAME"
+            if ($UseClassicDNS -eq $true) {
+                $CNameHost = Resolve-PSMTASTSDnsName -Name "mta-sts.$Domain" -Type "CNAME" -Server $DnsServer
+            } else {
+                $CNameHost = (Invoke-RestMethod -URI "https://dns.google/resolve?name=mta-sts.$Domain&type=CNAME").Answer.data
+            }
             If ($Null -ne $CNameHost) {
                 $Hostname = $CNameHost.NameHost
             }
@@ -208,7 +222,13 @@ max_age: 604800
 
             # Check MTA-STS CNAME record
             $mtaStsName = "mta-sts." + $domain
-            $cnameRecord = Resolve-PSMTASTSDnsName -Name $mtaStsName -Type CNAME -Server $DnsServer -ErrorAction SilentlyContinue
+            if ($UseClassicDNS -eq $true) {
+                $cnameRecord = Resolve-PSMTASTSDnsName -Name $mtaStsName -Type CNAME -Server $DnsServer -ErrorAction SilentlyContinue
+            } else {
+                $cnameRecord = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsName&type=CNAME").Answer.data
+                # Remove the trailing dot from the CNAME record returned by Google DNS
+                $cnameRecord = $cnameRecord.Substring(0, $cnameRecord.Length - 1)
+            }
 
             if ($cnameRecord -and ($resultObject.Host -eq $cnameRecord.NameHost)) {
                 $resultObject.MTA_STS_CNAME = "OK"
@@ -255,9 +275,23 @@ max_age: 604800
 
             # Checking MX Record
             # Example: example.com. IN MX 0 example-com.mail.protection.outlook.com.
-            $mxRecord = Resolve-PSMTASTSDnsName -Name $domain -Type MX -Server $DnsServer -ErrorAction SilentlyContinue
-
-            $resultObject.MX_Record_Pointing_To = $mxRecord.NameExchange -join ", "
+            if ($UseClassicDNS -eq $true) {
+                $mxRecord = Resolve-PSMTASTSDnsName -Name $domain -Type MX -Server $DnsServer -ErrorAction SilentlyContinue
+                $resultObject.MX_Record_Pointing_To = $mxRecord.NameExchange -join ", "
+            } else {
+                $mxRecord = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$domain&type=MX").Answer.data
+                # Split Each MX record by space to separate the priority and the host
+                $mxRecord = $mxRecord | ForEach-Object {
+                    $parts = $_.split(" ")
+                    [PSCustomObject]@{
+                        Priority = $parts[0]
+                        NameExchange = $parts[1]
+                    }
+                }
+                # Remove the trailing dot from each MX record returned by Google DNS
+                $mxRecord = $mxRecord | ForEach-Object { $_.NameExchange = $_.NameExchange.Substring(0, $_.NameExchange.Length - 1); $_ }
+                $resultObject.MX_Record_Pointing_To = $mxRecord.NameExchange -join ", "
+            }
 
             <# Removed the MX record check, because we cannot tell foreach domain, which MX record is correct. Previously, this was possible, as we only checked for the single Exchange Online MX record *.mail.protection.outlook.com.
             # Check if the domain is an onmicrosoft.com domain

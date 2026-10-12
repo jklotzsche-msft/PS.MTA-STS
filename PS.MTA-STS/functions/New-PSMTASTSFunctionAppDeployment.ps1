@@ -60,6 +60,9 @@
     .PARAMETER DnsServer
         Provide a String containing the IP address of the DNS server, which should be used to query the MX record. Default is 8.8.8.8 (Google DNS).
 
+    .PARAMETER UseClassicDNS
+        Switch to use the classic DNS resolution method with Resolve-DnsName. If not specified, the function will use the Google DNS over HTTPS method.
+
     .PARAMETER WhatIf
         If this switch is provided, no changes will be made. Only a summary of the changes will be shown.
 
@@ -146,17 +149,26 @@
                 # if the list of entries is valid, return $true
                 $true
             })]
+        
+        [Parameter(Mandatory = $false)]
         [String[]]
         $ExoHostName,
 
+        [Parameter(Mandatory = $false)]
         [String]
         $DnsServer = "8.8.8.8",
 
+        [Parameter(Mandatory = $false)]
+        [Switch]
+        $UseClassicDNS,
+
         #Register AZ Resource Provider
+        [Parameter(Mandatory = $false)]
         [Switch]
         $RegisterResourceProvider,
 
         #Disable Application Insights
+        [Parameter(Mandatory = $false)]
         [Switch]
         $DisableApplicationInsights
     )
@@ -224,7 +236,12 @@
         }
 
         # Check if Storage StorageAccountName already exists
-        $storageAccountDnsResult = Resolve-PSMTASTSDnsName -Name "$StorageAccountName.blob.core.windows.net" -Type A -Server $DnsServer
+        If ($UseClassicDNS -eq $true) {
+            $storageAccountDnsResult = Resolve-PSMTASTSDnsName -Name "$StorageAccountName.blob.core.windows.net" -Type A -Server $DnsServer
+        } else {
+            $storageAccountDnsResult = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$StorageAccountName.blob.core.windows.net&type=A").Answer.data
+        }
+
         if ($null -ne $storageAccountDnsResult) {
             $StorageAccounts = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName
 
@@ -244,7 +261,11 @@
         }
 
         # Check, if FunctionApp exists already
-        $functionAppDnsResult = Resolve-PSMTASTSDnsName -Name "$FunctionAppName.azurewebsites.net" -Type A -Server $DnsServer
+        If ($UseClassicDNS -eq $true) {
+            $functionAppDnsResult = Resolve-PSMTASTSDnsName -Name "$FunctionAppName.azurewebsites.net" -Type A -Server $DnsServer
+        } else {
+            $functionAppDnsResult = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$FunctionAppName.azurewebsites.net&type=A").Answer.data
+        }
         if ($null -ne $functionAppDnsResult) {
             throw "Function App already exists. Please provide a different name for the Function Account."
         }
