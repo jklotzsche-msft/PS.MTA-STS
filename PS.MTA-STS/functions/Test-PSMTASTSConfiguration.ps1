@@ -21,6 +21,9 @@
         .PARAMETER DnsServer
         Provide IP address of DNS server to use for DNS queries. Default is 8.8.8.8 (Google DNS).
 
+        .PARAMETER UseClassicDNS
+        Provide a switch to use the classic DNS resolver instead of the default one.
+
         .PARAMETER DisplayResult
         Provide a Boolean value, if the result should be displayed in the console. Default is $true.
 
