@@ -95,7 +95,7 @@
 
         #Skip DNS Tests
         [switch]
-        $SkipDNSTests
+        $SkipDNSTests,
 
         [Parameter(Mandatory = $false)]
         [switch]
