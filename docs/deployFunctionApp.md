@@ -6,23 +6,25 @@ This guide will help you to deploy MTA-STS for your domain(s) using a Azure Func
 
 ## Table of Contents
 
-- [Prerequisites](#prerequisites)
-- [Terminology](#terminology)
-- [Deployment](#deployment)
-  - [Step 1: Create list of domains to deploy MTA-STS for](#step-1-create-list-of-domains-to-deploy-mta-sts-for)
-  - [Step 2: Create Azure Function App](#step-2-create-azure-function-app)
-    - [Step 2.1: Create Azure resources automatically](#step-21-create-azure-resources-automatically)
-    - [Step 2.2: Create Azure resources manually](#step-22-create-azure-resources-manually)
-  - [Step 3: Create CNAME and TXT records in public DNS for your domains](#step-3-create-cname-and-txt-records-in-public-dns-for-your-domains)
-  - [Step 4: Add custom domains to Azure Function App](#step-4-add-custom-domains-to-azure-function-app)
-    - [Step 4.1: Add custom domains to Azure Function App automatically](#step-41-add-custom-domains-to-azure-function-app-automatically)
-    - [Step 4.2: Add custom domains to Azure Function App manually](#step-42-add-custom-domains-to-azure-function-app-manually)
-  - [Step 5: Create TXT record in public DNS to enable MTA-STS](#step-5-create-txt-record-in-public-dns-to-enable-mta-sts)
-  - [Step 6: Verify MTA-STS policy](#step-6-verify-mta-sts-policy)
-- [CONGRATULATIONS! You have successfully configured MTA-STS for your domains](#conclusion)
-  - [Monitoring and Reporting](#monitoring-and-reporting)
-  - [TLS-RPT](#tls-rpt)
-  - [Feedback](#feedback)
+- [Deploy MTA-STS using a Azure Function App](#deploy-mta-sts-using-a-azure-function-app)
+  - [Table of Contents](#table-of-contents)
+  - [Prerequisites](#prerequisites)
+  - [Terminology](#terminology)
+  - [Deployment](#deployment)
+    - [Step 1: Create list of domains to deploy MTA-STS for](#step-1-create-list-of-domains-to-deploy-mta-sts-for)
+    - [Step 2: Create Azure Function App](#step-2-create-azure-function-app)
+      - [Step 2.1: Create Azure resources automatically](#step-21-create-azure-resources-automatically)
+      - [Step 2.2: Create Azure resources manually](#step-22-create-azure-resources-manually)
+    - [Step 3: Create CNAME and TXT records in public DNS for your domains](#step-3-create-cname-and-txt-records-in-public-dns-for-your-domains)
+    - [Step 4: Add custom domains to Azure Function App](#step-4-add-custom-domains-to-azure-function-app)
+      - [Step 4.1: Add custom domains to Azure Function App automatically](#step-41-add-custom-domains-to-azure-function-app-automatically)
+      - [Step 4.2: Add custom domains to Azure Function App manually](#step-42-add-custom-domains-to-azure-function-app-manually)
+    - [Step 5: Create TXT record in public DNS to enable MTA-STS](#step-5-create-txt-record-in-public-dns-to-enable-mta-sts)
+    - [Step 6: Verify MTA-STS policy](#step-6-verify-mta-sts-policy)
+  - [Conclusion](#conclusion)
+    - [Monitoring and Reporting](#monitoring-and-reporting)
+    - [TLS-RPT](#tls-rpt)
+    - [Feedback](#feedback)
 
 ## Prerequisites
 
@@ -32,6 +34,7 @@ This guide will help you to deploy MTA-STS for your domain(s) using a Azure Func
   > **NOTE** Please make sure you have the required permissions to create the Azure resources and that there are no policies in place, which prevent you from using PowerShell to deploy Azure resources. If you are not sure, please contact your Azure Administrator.
 
 3. PowerShell modules
+
     - [Az.Accounts](https://www.powershellgallery.com/packages/Az.Accounts)
     - [Az.Functions](https://www.powershellgallery.com/packages/Az.Functions)
     - [Az.Resources](https://www.powershellgallery.com/packages/Az.Resources)
@@ -77,7 +80,11 @@ To create the list, we will use the prepared PowerShell function [Export-PSMTAST
 To run the function, open a PowerShell console, install and import the module:
 
 ```PowerShell
-Install-Module -Name PS.MTA-STS
+# PowerShellGet
+Install-Module -Name PS.MTA-STS -Scope CurrentUser
+
+# Microsoft.PowerShell.PSResourceGet
+Install-PSResource -Name PS.MTA-STS -Scope CurrentUser
 ```
 
 Then, run the function (edit the path to the CSV file as needed):
@@ -124,7 +131,7 @@ New-PSMTASTSFunctionAppDeployment -Location "westeurope" -ResourceGroupName "rg-
 
 This will look like this:
 
-<img alt="Screenshot of creation of Azure Function App function" src="./_images/1_0_deploy_0.png" width="1000" />
+![Screenshot of creation of Azure Function App function](./_images/1_0_deploy_0.png)
 
 (You can safely ignore the warning about the "Upcoming breaking changes in the cmdlet 'New-AzStorageAccount'")
 
@@ -138,7 +145,7 @@ First of all, we must create a resource group which will combine all necessary r
 
 Select your subscription, provide a name for your resource group, select your desired region and select "Review + create".
 
-<img alt="Screenshot of creation of resource group" src="./_images/1_1_deploy_0.png" width="500" />
+![Screenshot of creation of resource group](./_images/1_1_deploy_0.png)
 
 After the validation passed, select "Create".
 
@@ -164,7 +171,7 @@ On the new page, enter the following information (as described at step 4 of [Enh
 - Deployment
   - Keep the default settings
 
-<img alt="Screenshot of creation of Azure Function App" src="./_images/1_1_deploy_1.png" width="500" />
+![Screenshot of creation of Azure Function App](./_images/1_1_deploy_1.png)
 
 Select "Review + create" and then "Create".
 
@@ -243,7 +250,7 @@ On the Function App service page, select "Functions" and then "Create".
 As "Development environment" select 'Develop in portal' and as "Template" select 'HTTP trigger'.
 Provide a name for your function, e.g. 'Publish-MTASTSPolicy' and as authorization select "Anonymous". "Anonymous" is required, as this script will be called by external servers which won't authenticate.
 
-<img alt="Screenshot of creation of Azure Function App function" src="./_images/1_1_deploy_2.png" width="500" />
+![Screenshot of creation of Azure Function App function](./_images/1_1_deploy_2.png)
 
 Select "Create" to create the function.
 
@@ -465,9 +472,9 @@ Select "Custom domains" and click "Add custom domain". The flyout will open and 
 4. Domain
     - Enter your custom domain. This must be the same domain you created the CNAME and TXT records for in step 3. The domain must be validated before it can be added.
 
-<img alt="Screenshot of adding custom domain to Azure Function App." src="./_images/1_1_deploy_3.png" width="500" />
+![Screenshot of adding custom domain to Azure Function App.](./_images/1_1_deploy_3.png)
 
-Click on "Validate" and after the validation passed, click on "Add" to add the custom domain.<br>Repeat these steps for each custom domain you want to add.
+Click on "Validate" and after the validation passed, click on "Add" to add the custom domain. Repeat these steps for each custom domain you want to add.
 
 ### Step 5: Create TXT record in public DNS to enable MTA-STS
 
