@@ -36,8 +36,8 @@
         .PARAMETER UseClassicDNS
         Switch to use the classic DNS resolution method with Resolve-DnsName. If not specified, the function will use the Google DNS over HTTPS method.
 
-        .PARAMETER NoTelemetry
-        Switch to disable sending telemetry events.
+        .PARAMETER SendTelemetry
+        Switch to enable sending telemetry events.
 
         .PARAMETER WhatIf
         Switch to run the command in a WhatIf mode.
@@ -100,7 +100,9 @@
         [switch]
         $UseClassicDNS = $false,
 
-        [switch]$NoTelemetry = $false
+        [Parameter(Mandatory = $false)]
+        [switch]
+        $SendTelemetry = $false
     )
     
     begin {
@@ -237,7 +239,7 @@
         }
 
         # Send telemetry event for added custom domains
-        if ($NoTelemetry -eq $false) {
+        if ($SendTelemetry -eq $true) {
             Foreach ($DomainName in $domainList)
             {
                 Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain $DomainName -TenantId (Get-AzContext).Tenant.Id

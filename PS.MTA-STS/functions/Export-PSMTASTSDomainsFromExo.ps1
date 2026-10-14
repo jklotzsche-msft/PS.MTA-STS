@@ -31,6 +31,9 @@
         .PARAMETER DnsServer
         Provide a String containing the IP address of the DNS server, which should be used to query the MX record. Default is 8.8.8.8 (Google DNS).
 
+        .PARAMETER UseClassicDNS
+        Provide a switch to use the classic DNS resolver instead of DNS over HTTPS. Default is $false.
+
         .PARAMETER SkipDNSTests
         With this Parameter the DNS Checks will be skipped
 
@@ -93,6 +96,10 @@
         #Skip DNS Tests
         [switch]
         $SkipDNSTests
+
+        [Parameter(Mandatory = $false)]
+        [switch]
+        $UseClassicDNS = $false
     )
     
     begin {
@@ -165,7 +172,13 @@
             # Checking MTA-STS TXT Record
             # Example: _mta-sts.example.com. IN TXT "v=STSv1; id=20160831085700Z"
             $mtaStsDNSHost = "_mta-sts." + $acceptedDomain.DomainName
-            $mtaStsTXTRecord = Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer | Where-Object { $_.Strings -match "v=STSv1" }
+            If ($UseClassicDNS) {
+                $mtaStsTXTRecord = Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer | Where-Object { $_.Strings -match "v=STSv1" }
+            }
+            Else {
+                $DNSAnswer = Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDNSHost&type=TXT"
+                $mtaStsTXTRecord = $DNSAnswer.Answer.data | Where-Object {$_ -match "v=STSv1"}
+            }
 
             if ($null -ne $mtaStsTXTRecord) {
                 $resultObject.MTA_STS_TXTRecord = $mtaStsTXTRecord.strings -join " | " # Strings are joined, because multiple strings can be returned
@@ -193,15 +206,33 @@
             # Checking TLSRPT Record
             # Example: _smtp._tls.example.com. IN TXT "v=TLSRPTv1;rua=mailto:reports@example.com"
             $tlsRptDNSHost = "_smtp._tls." + $acceptedDomain.DomainName
-            $tlsRptRecord = Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -like "v=TLSRPTv1*" }
+            If ($UseClassicDNS) {
+                $tlsRptRecord = (Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -like "v=TLSRPTv1*" }).Strings
+            }
+            Else {
+                $DNSAnswer = Invoke-RestMethod -URI "https://dns.google/resolve?name=$tlsRptDNSHost&type=TXT"
+                $tlsRptRecord = $DNSAnswer.Answer.data | Where-Object {$_ -match "v=TLSRPTv1"}
+                # $tlsRptRecord = Resolve-DnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -like "v=TLSRPTv1*" }
+            }
 
             if ($null -ne $tlsRptRecord) {
-                $resultObject.TLSRPT = $tlsRptRecord.Strings[0]
+                $resultObject.TLSRPT = $tlsRptRecord
             }
 
             # Checking MX Record
             # Example: example.com. IN MX 0 example-com.mail.protection.outlook.com.
-            $mxRecord = Resolve-PSMTASTSDnsName -Name $acceptedDomain.DomainName -Type MX -Server $DnsServer -ErrorAction SilentlyContinue
+            If ($UseClassicDNS) {
+                $mxRecord = (Resolve-PSMTASTSDnsName -Name $acceptedDomain.DomainName -Type MX -Server $DnsServer -ErrorAction SilentlyContinue).NameExchange
+            }
+            Else {
+                $DNSAnswer = Invoke-RestMethod -URI "https://dns.google/resolve?name=$($acceptedDomain.DomainName)&type=MX"
+                $mxRecord = $DNSAnswer.Answer.data | ForEach-Object {
+                    $parts = ($_ -split ' ')
+                    if ($parts.Count -gt 1) {
+                        $parts[1].TrimEnd('.')
+                    }
+                }
+            }
 
             # $resultObject.MTA_STS_CanBeUsed = "No" # Default value
             # Check if the domain is an onmicrosoft.com domain
@@ -210,7 +241,7 @@
             }
             else {
                 # new else block to skip MX Record check
-                $resultObject.MX_Record_Pointing_To = $mxRecord.NameExchange
+                $resultObject.MX_Record_Pointing_To = $mxRecord -join ", "
             }
             <# Removed the MX record check, because we cannot tell foreach domain, which MX record is correct. Previously, this was possible, as we only checked for the single Exchange Online MX record *.mail.protection.outlook.com.
             # Check if the MX record points to Exchange Online

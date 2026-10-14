@@ -209,9 +209,15 @@ max_age: 604800
             # Checking MTA-STS TXT Record
             # Example: _mta-sts.example.com. IN TXT "v=STSv1; id=20160831085700Z"
             $mtaStsDNSHost = "_mta-sts." + $domain
-            $mtaStsTXTRecord = Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -match "v=STSv1" }
+            If ($UseClassicDNS -eq $true) {
+                $mtaStsTXTRecord = (Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -match "v=STSv1" }).Strings
+            }
+            Else {
+                $DNSAnswer = Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDNSHost&type=TXT"
+                $mtaStsTXTRecord = $DNSAnswer.Answer.data | Where-Object {$_ -match "v=STSv1"}
+            }
 
-            if ($mtaStsTXTRecord -and ($mtaStsTXTRecord.strings -like $txtRecordContent)) {
+            if ($mtaStsTXTRecord -and ($mtaStsTXTRecord -like $txtRecordContent)) {
                 $resultObject.MTA_STS_TXTRecord = "OK"
             }
             elseif ($mtaStsTXTRecord -and ($mtaStsTXTRecord.strings -notlike $txtRecordContent)) {
