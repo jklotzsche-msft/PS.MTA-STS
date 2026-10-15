@@ -242,7 +242,7 @@
         if ($SendTelemetry -eq $true) {
             Foreach ($DomainName in $domainList)
             {
-                Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain $DomainName -TenantId (Get-AzContext).Tenant.Id
+                Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain $DomainName
             }
         }
     }

@@ -143,7 +143,6 @@ Push-OutputBinding -Name MtaStsTelemetry -Value @{
     RowKey       = [System.Guid]::NewGuid().ToString()
     EventType    = $event.eventType
     Domain       = $event.domain
-    TenantId     = $event.tenantId
     Timestamp    = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 }
 
@@ -154,12 +153,13 @@ Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
 
 ## Event Payload
 
+Eventtype: AddDomain/RemoveDomain
+
 ```json
 $Body = @"
 {
     "eventType": "AddDomain",
-    "domain": "contoso.com",
-    "tenantId": "46bbad84-29f0-4e03-8d34-f6841a5071ad",
+    "domain": "contoso.com"
 }
 "@
 $ContentType = "application/json"

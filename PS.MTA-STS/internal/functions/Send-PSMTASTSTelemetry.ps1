@@ -36,16 +36,13 @@ function Send-PSMTASTSTelemetry {
     param(
         [string]$TelemetryEndpoint,  # URL of the receiver Function
         [string][validateSet("AddDomain","RemoveDomain")]$EventType,
-        [string]$Domain,
-        [string]$TenantId
+        [string]$Domain
     )
 
     # Construct the payload for the telemetry event
     $Payload = @{
         eventType = $EventType
         domain = $Domain
-        tenantId = $TenantId
-        policyMode = $PolicyMode
     }
     $body = $Payload | ConvertTo-Json -Depth 3 -Compress
 
