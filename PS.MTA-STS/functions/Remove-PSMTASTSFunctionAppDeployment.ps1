@@ -100,11 +100,11 @@
             $FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
 
             # Remove Application Insights instance if it exists and the DoNotRemoveApplicationInsights switch is not set
-            if ($DoNotRemoveApplicationInsights -eq $false) 
+            if ($DoNotRemoveApplicationInsights -eq $false)
             {
                 Write-Verbose "Removing Application Insights instance if it exists."
                 $ApplicationInsightsConnectionString = $FunctionAppSetting['APPLICATIONINSIGHTS_CONNECTION_STRING']
-                if ($ApplicationInsightsConnectionString -match 'InstrumentationKey=([^;]+)') 
+                if ($ApplicationInsightsConnectionString -match 'InstrumentationKey=([^;]+)')
                 {
                     $InstrumentationKey = $matches[1]
                 }
@@ -141,10 +141,10 @@
             $null = Remove-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $AppServicePlan -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
 
             # Remove Certificates from the Resource Group
-            $Certificates = Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType "Microsoft.Web/certificates" 
-            foreach ($Certificate in $Certificates) 
+            $Certificates = Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType "Microsoft.Web/certificates"
+            foreach ($Certificate in $Certificates)
             {
-                If ($Certificate.Name -match $CertName) 
+                If ($Certificate.Name -match $CertName)
                 {
                     $Null = Remove-AzResource -ResourceId $Certificate.ResourceId -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
                     Write-Verbose "Removed Certificate $($Certificate.Name) from Resource Group $ResourceGroupName."

@@ -178,10 +178,8 @@ max_age: 604800
 
             if ($UseClassicDNS -eq $true) {
                 $CNameHost = (Resolve-PSMTASTSDnsName -Name "mta-sts.$Domain" -Type "CNAME" -Server $DnsServer).NameHost
-                Write-HOST "Resolved CNAME for mta-sts.$Domain > $CNameHost"
             } else {
                 $CNameHost = ((Invoke-RestMethod -URI "https://dns.google/resolve?name=mta-sts.$Domain&type=CNAME").Answer.data).trim(".")
-                Write-HOST "Resolved CNAME for mta-sts.$Domain via Google DNS > $CNameHost"
             }
             If ($Null -ne $CNameHost) {
                 $Hostname = $CNameHost

@@ -36,7 +36,7 @@
         .EXAMPLE
         Remove-PSMTASTSCustomDomain -CsvPath "C:\temp\accepted-domains.csv" -ResourceGroupName "MTA-STS" -FunctionAppName "func-MTA-STS" [-SendTelemetry]
 
-        Reads list of accepted domains from "C:\temp\accepted-domains.csv" and removes them from Function App "func-MTA-STS" in Resource Group "MTA-STS". 
+        Reads list of accepted domains from "C:\temp\accepted-domains.csv" and removes them from Function App "func-MTA-STS" in Resource Group "MTA-STS".
 
         .EXAMPLE
         Remove-PSMTASTSCustomDomain -DomainName "contoso.com", "fabrikam.com" -ResourceGroupName "MTA-STS" -FunctionAppName "func-MTA-STS" [-SendTelemetry]
