@@ -27,18 +27,18 @@ https://github.com/jklotzsche-msft/PS.MTA-STS/issues/new
 
 If you want to fix a bug, add a feature, or improve existing functionality:
 
-1. Fork the repository.
-2. Create a new branch from the develop branch in your fork.
-3. Make your changes in that branch.
-4. Validate your changes locally.
-5. Open a pull request back to the original repository’s develop branch.
+1. Fork the repository
+2. Create a new branch
+3. Make your changes in that branch
+4. Validate your changes locally
+5. Open a pull request back to the original repository’s develop branch
 
 Please make sure your PR description clearly explains:
 
 - the problem being solved
 - the change you made
 - why the change is needed
-- any validation or testing performed
+- make sure you run the Tests without error [pester.ps1](tests\pester.ps1)
 
 ## Development guidelines
 

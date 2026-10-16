@@ -46,12 +46,12 @@
         Switch to run the command in a Confirm mode.
 
         .EXAMPLE
-        Add-PSMTASTSCustomDomain -CsvPath "C:\temp\accepted-domains.csv" -ResourceGroupName "MTA-STS" -FunctionAppName "func-MTA-STS"
+        Add-PSMTASTSCustomDomain -CsvPath "C:\temp\accepted-domains.csv" -ResourceGroupName "MTA-STS" -FunctionAppName "func-MTA-STS" [-SendTelemetry]
 
         Reads list of accepted domains from "C:\temp\accepted-domains.csv" and adds them to Function App "func-MTA-STS" in Resource Group "MTA-STS". It also creates new certificate for each domain and adds binding to Function App.
 
         .EXAMPLE
-        Add-PSMTASTSCustomDomain -DomainName "contoso.com", "fabrikam.com" -ResourceGroupName "MTA-STS" -FunctionAppName "func-MTA-STS"
+        Add-PSMTASTSCustomDomain -DomainName "contoso.com", "fabrikam.com" -ResourceGroupName "MTA-STS" -FunctionAppName "func-MTA-STS" [-SendTelemetry]
 
         Adds domains "contoso.com" and "fabrikam.com" to Function App "func-MTA-STS" in Resource Group "MTA-STS". It also creates new certificate for each domain and adds binding to Function App.
 
@@ -175,7 +175,7 @@
                 continue
             }
 
-            #Check if CAA record exists and contains digicert.com
+            #Check if CAA record exists and contains digicert.com > CAA can't be resolved through Resolve-PSMTASTSDnsName
             If ($SkipCAACheck -ne $true) {
                 $json = Invoke-RestMethod -Uri "https://dns.google/resolve?name=$Domain&type=CAA"
                 If ($Null -ne $json.Answer.Data) {

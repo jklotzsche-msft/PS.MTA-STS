@@ -4,45 +4,38 @@
         Removes the Azure Function App with the needed PowerShell code to publish MTA-STS policies.
 
     .DESCRIPTION
-        Creates an Azure Function App with the needed PowerShell code to publish MTA-STS policies.
-        The Azure Function App will be created in the specified resource group and location.
-        If the resource group doesn't exist, it will be created.
-        If the Azure Function App doesn't exist, it will be created.
-        If the Azure Function App exists, it will be updated with the latest PowerShell code. This will overwrite any changes you made to the Azure Function App!
+        Removes the Azure Function App with the needed PowerShell code to publish MTA-STS policies.
+        The Azure Function App will be removed from the specified resource group.
+        If the resource group doesn't exist, an error will be thrown.
+        If the Azure Function App doesn't exist, an error will be thrown.
+        If the Azure Function App exists, it will be removed along with the associated Azure Storage Account.
 
     .PARAMETER ResourceGroupName
-        Provide the name of the Azure resource group, where the Azure Function App should be created.
-        If the resource group doesn't exist, it will be created.
-        If the resource group exists already, it will be used.
+        Provide the name of the Azure resource group, where the Azure Function App should be removed from.
 
     .PARAMETER FunctionAppName
-        Provide the name of the Azure Function App, which should be created.
-        If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
-        If the Azure Function App exists, it will be updated with the latest PowerShell code. This will overwrite any changes you made to the Azure Function App!
+        Provide the name of the Azure Function App, which should be removed.
 
     .PARAMETER StorageAccountName
-        Provide the name of the Azure Storage Account, which should be created.
-        If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
+        Provide the name of the Azure Storage Account, which should be removed.
+        If the Azure Function App doesn't exist, an error will be thrown.
+
+    .PARAMETER DoNotRemoveApplicationInsights
+        Switch parameter to prevent the removal of the associated Application Insights instance.
 
     .PARAMETER Confirm
-    Prompts you for confirmation before running the cmdlet.
+        Prompts you for confirmation before running the cmdlet.
 
     .PARAMETER WhatIf
-    Shows what would happen if the cmdlet runs. The cmdlet does not run.
+        Shows what would happen if the cmdlet runs. The cmdlet does not run.
 
-    .PARAMETER PlanName
-    Provide the name of the Azure App Service Plan, which should be created.
-    If the Azure Function App doesn't exist, the Azure Storace Account and Azure Function App will be created.
-
-    If the PlanName is provided, the location will be set to the location of the App Service Plan.
-    The location will still be used to create the resource group.
+        If the PlanName is provided, the location will be set to the location of the App Service Plan.
+        The location will still be used to create the resource group.
 
     .EXAMPLE
-        New-PSMTASTSFunctionAppDeployment -Location 'West Europe' -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS' -StorageAccountName 'stpsmtasts'
-        
-        Creates an Azure Function App with the name 'PSMTASTS' in the resource group 'PSMTASTS' in the location 'West Europe' with policy mode 'Enforce'.
-        If the resource group doesn't exist, it will be created.
-        If the Azure Function App doesn't exist, it will be created and app files published.
+        Remove -PSMTASTSFunctionAppDeployment -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS' -StorageAccountName 'stpsmtasts'
+
+        Removes the Azure Function App with the name 'PSMTASTS' in the resource group 'PSMTASTS' and the associated Azure Storage Account.
 
     .LINK
         https://github.com/jklotzsche-msft/PS.MTA-STS
@@ -82,7 +75,10 @@
                     $true
                 }
             })]
-        [String]$StorageAccountName
+        [String]$StorageAccountName,
+        
+        [Parameter(Mandatory = $false)]
+        [switch]$DoNotRemoveApplicationInsights = $false
     )
     #endregion Parameter
 
@@ -97,30 +93,63 @@
             Write-Verbose "Function App $FunctionAppName not found. Nothing to remove."
             return
         } else{
-            #Getting App Service Plan
+            # Getting App Service Plan
             $AppServicePlan = $FunctionApp.AppServicePlan
 
-            #Get Function AppSetting for Storage Account
+            # Get Function AppSetting for Storage Account
             $FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
-        
-            #Get Storage Account
+
+            # Remove Application Insights instance if it exists and the DoNotRemoveApplicationInsights switch is not set
+            if ($DoNotRemoveApplicationInsights -eq $false) 
+            {
+                Write-Verbose "Removing Application Insights instance if it exists."
+                $ApplicationInsightsConnectionString = $FunctionAppSetting['APPLICATIONINSIGHTS_CONNECTION_STRING']
+                if ($ApplicationInsightsConnectionString -match 'InstrumentationKey=([^;]+)') 
+                {
+                    $InstrumentationKey = $matches[1]
+                }
+
+                # Remove Application Insights instance if it exists
+                $ApplicationInsights = Get-AzApplicationInsights | Where-Object InstrumentationKey -eq $InstrumentationKey
+                $Null = Remove-AzApplicationInsights -ResourceGroupName $ApplicationInsights.ResourceGroupName -Name $ApplicationInsights.Name -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                
+                # Delete Smart detector alert rule
+                $SmartDetectorAlertRules = Get-AzResource -ResourceGroupName RG_MTASTS2 -ResourceType "microsoft.alertsmanagement/smartdetectoralertrules" | Where-Object {$_.Name -match "$FunctionAppName"}
+                foreach ($SmartDetectorAlertRule in $SmartDetectorAlertRules) {
+                    $Null = Remove-AzResource -ResourceId $SmartDetectorAlertRule.ResourceId -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                }
+            }
+
+            # Get Certificates associated with the Function App
+            Write-Verbose "Removing Certificates from Resource Group $ResourceGroupName."
+            $webApp = Get-AzWebApp -ResourceGroupName RG_MTASTS2 -Name IRGENDWOIMINTERNET-MTASTS
+            $CertName = ($webApp.HostNameSslStates |  Where-Object { $_.Thumbprint }).Name
+
+            # Get Storage Account
             $StorageAccountName = $FunctionAppSetting.WEBSITE_CONTENTAZUREFILECONNECTIONSTRING.split(";")[1].Replace("AccountName=", "")
 
-            #Delete Function App
+            # Delete Function App
             Write-Verbose "Deleting Function App $FunctionAppName in Resource Group $ResourceGroupName"
             $null = Remove-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
 
-            #Delete Storage Account
+            # Delete Storage Account
             Write-Verbose "Deleting Storage Account $StorageAccountName in Resource Group $ResourceGroupName"
             $null = Remove-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
 
-            #Delete App Service Plan
+            # Delete App Service Plan
             Write-Verbose "Deleting App Service Plan $AppServicePlan in Resource Group $ResourceGroupName"
             $null = Remove-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $AppServicePlan -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
 
-            # Delete Application Insights
-
-            # Delete Smart detector alert rule
+            # Remove Certificates from the Resource Group
+            $Certificates = Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType "Microsoft.Web/certificates" 
+            foreach ($Certificate in $Certificates) 
+            {
+                If ($Certificate.Name -match $CertName) 
+                {
+                    $Null = Remove-AzResource -ResourceId $Certificate.ResourceId -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                    Write-Verbose "Removed Certificate $($Certificate.Name) from Resource Group $ResourceGroupName."
+                }
+            }
 
         }
     }

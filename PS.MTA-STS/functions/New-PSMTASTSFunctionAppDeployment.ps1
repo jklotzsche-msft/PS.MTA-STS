@@ -162,15 +162,15 @@
         [Switch]
         $UseClassicDNS,
 
-        #Register AZ Resource Provider
+        # Register AZ Resource Provider
         [Parameter(Mandatory = $false)]
         [Switch]
         $RegisterResourceProvider,
 
-        #Disable Application Insights
+        # Disable Application Insights
         [Parameter(Mandatory = $false)]
         [Switch]
-        $DisableApplicationInsights
+        $EnableApplicationInsights
     )
     #endregion Parameter
 
@@ -291,7 +291,7 @@
         # Enable soft delete for blobs
         try {
             $ctx = New-AzStorageContext -StorageAccountName $StorageAccountName -WarningAction SilentlyContinue
-            $null = Enable-AzStorageDeleteRetentionPolicy -RetentionDays $StorageDeleteRetentionInDays -Context $ctx
+            $null = Enable-AzStorageDeleteRetentionPolicy -RetentionDays $StorageDeleteRetentionInDays -Context $ctx -WarningAction SilentlyContinue
         }
         catch {
             Write-Warning "Could not enable soft delete for blobs in Storage Account $StorageAccountName. Please enable it manually, if needed."
@@ -375,7 +375,7 @@
             $updateFunctionAppProps.ExoHostName = $ExoHostName
         }
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update")) {
-            $null = Update-PSMTASTSFunctionAppFile @updateFunctionAppProps
+            $null = Update-PSMTASTSFunctionAppFile @updateFunctionAppProps -WarningAction SilentlyContinue
         }
 
         # Restore the original culture for the current thread

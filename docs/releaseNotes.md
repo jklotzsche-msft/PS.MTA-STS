@@ -17,9 +17,10 @@ The 1.4.0 release of the PS.MTA-STS module includes (but is not limited to) the 
 - Update-PSMTASTSFunctionAppFile updates Storage Account to TLS1.2 - ([GitHub Issue #45](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/45)) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
 - Remove-PSMTASTSFunctionAppDeployment removes FunctionApp, Storage Account and App Service Plan - ([GitHub Issue #41](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/41)) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
 - New-PSMTASTSFunctionAppDeployment Disabled ApplicationInsights by default but can be enabled with -EnableApplicationInsights
-- Added a Telemetry Function with a parameter `SendTelemetry` to `Add/Remove-PSMTASTSCustomDomain` - ([GitHub Issue #31](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/31) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- Added an optional Telemetry Function with a parameter `SendTelemetry` to `Add/Remove-PSMTASTSCustomDomain` - ([GitHub Issue #31](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/31) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
 - Updated tp Pester 6.2.0 --> Thanks to [BohrenAn](https://github.com/BohrenAn)
 - Resolve-PSMTASTSDnsName.ps1 upated to DNS over HTTPS - ([GitHub Issue #40](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/40))
+- Updated Documentation / Readme / Contributing --> Thanks to [BohrenAn](https://github.com/BohrenAn)
 
 ## Version 1.3.1
 

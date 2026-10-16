@@ -1,6 +1,72 @@
 # Documentation
 
-Ideas about how to implement a Telemetry Function
+As a Project we don't have any idea how much this PowerShell Module is used apart from the Downloads on the PSGallery.
+
+So we came up with an optional Telemetry Service when using 'Add-PSMTASTSCustomDomain' / 'Remove-PSMTASTSCustomDomain'.
+
+- The customer uses the module to add or remove a custom domain.
+- The module sends a small telemetry event to a Function App when using -SendTelemetry
+- The Telemetry Function App stores that event in Azure Table Storage.
+- The customer never directly manages this telemetry pipeline; it is an optional background service.
+
+We would love to see how many domains are protected with our PowerShell Module 😍 so please use the -SendTelemetry parameter 👏
+
+## Telemetry Architecture
+
+```txt
++-----------------------------------------------------------------------+
+| Customer / Admin                                                      |
+|                                                                       |
+|  Runs:                                                                |
+|  - Add-PSMTASTSCustomDomain -DomainName contoso.com -SendTelemetry    |
+|  - Remove-PSMTASTSCustomDomain -DomainName contoso.com -SendTelemetry |
+|                                                                       |
+|  Optional telemetry is sent only with the -SendTelemetry parameter    |
++------------------------------------+----------------------------------+
+                                     |
+                                     | HTTPS POST
+                                     | JSON payload:
+                                     | {
+                                     |   "eventType": "AddDomain/RemoveDomain",
+                                     |   "domain": "contoso.com"
+                                     | }
+                                     v
++------------------------------------+----------------------------------+
+| PS.MTA-STS PowerShell Module                                          |
+|                                                                       |
+|  - Detects domain change operation                                    |
+|  - Builds telemetry event                                             |
+|  - Sends it to the telemetry endpoint                                 |
++------------------------------------+----------------------------------+
+                                     |
+                                     | POST to:
+                                     | https://mtaststelemetry.azurewebsites.net/telemetry
+                                     v
++------------------------------------+----------------------------------+
+| Azure Function App (Telemetry Receiver)                               |
+|                                                                       |
+|  - HTTP trigger (anonymous POST)                                      |
+|  - Receives event payload                                             |
+|  - Writes telemetry record to storage                                 |
++------------------------------------+----------------------------------+
+                                     |
+                                     | Output binding
+                                     v
++------------------------------------+----------------------------------+
+| Azure Table Storage                                                   |
+|                                                                       |
+|  Table: MtaStsTelemetry                                               |
+|                                                                       |
+|  Record fields:                                                       |
+|  - PartitionKey = Telemetry                                           |
+|  - RowKey = GUID                                                      |
+|  - EventType                                                          |
+|  - Domain                                                             |
+|  - Timestamp                                                          |
++-----------------------------------------------------------------------+
+```
+
+## Infrastructure
 
 ```pwsh
 # Variables
@@ -22,7 +88,6 @@ $newAzStorageAccountProps = @{
     EnableSftp             = $false
 }
 $null = New-AzStorageAccount @newAzStorageAccountProps
-
 
 # Create Storage Table
 $StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroup -Name $StorageAccountName
@@ -51,13 +116,12 @@ New-AzFunctionApp @newAzFunctionAppProps
 # Set FTP disabled
 $null = Set-AzWebApp -ResourceGroup $ResourceGroup -Name $FunctionAppName -FtpsState Disabled
 
-
-# Set TLS Version 1.3
+# Set TLS Version 1.2
 $subscriptionId = (Get-AzContext).Subscription.Id
 $body = @{
     properties = @{
-        minTlsVersion     = "1.3"
-        scmMinTlsVersion  = "1.3"
+        minTlsVersion     = "1.2"
+        scmMinTlsVersion  = "1.2"
     }
 } | ConvertTo-Json -Depth 3
 
@@ -92,7 +156,6 @@ $null = Invoke-AzRestMethod -Method PATCH -Path $path -Payload $body
   }
 }
 ```
-
 
 ## function.json
 

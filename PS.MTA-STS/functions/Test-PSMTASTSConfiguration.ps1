@@ -177,12 +177,14 @@ max_age: 604800
             Write-Verbose "Checking $counter / $($domainList.count) - $($domain)"
 
             if ($UseClassicDNS -eq $true) {
-                $CNameHost = Resolve-PSMTASTSDnsName -Name "mta-sts.$Domain" -Type "CNAME" -Server $DnsServer
+                $CNameHost = (Resolve-PSMTASTSDnsName -Name "mta-sts.$Domain" -Type "CNAME" -Server $DnsServer).NameHost
+                Write-HOST "Resolved CNAME for mta-sts.$Domain > $CNameHost"
             } else {
-                $CNameHost = (Invoke-RestMethod -URI "https://dns.google/resolve?name=mta-sts.$Domain&type=CNAME").Answer.data
+                $CNameHost = ((Invoke-RestMethod -URI "https://dns.google/resolve?name=mta-sts.$Domain&type=CNAME").Answer.data).trim(".")
+                Write-HOST "Resolved CNAME for mta-sts.$Domain via Google DNS > $CNameHost"
             }
             If ($Null -ne $CNameHost) {
-                $Hostname = $CNameHost.NameHost
+                $Hostname = $CNameHost
             }
             else {
                 $Hostname = ""
@@ -213,14 +215,13 @@ max_age: 604800
                 $mtaStsTXTRecord = (Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -match "v=STSv1" }).Strings
             }
             Else {
-                $DNSAnswer = Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDNSHost&type=TXT"
-                $mtaStsTXTRecord = $DNSAnswer.Answer.data | Where-Object {$_ -match "v=STSv1"}
+                $mtaStsTXTRecord = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDNSHost&type=TXT" | Where-Object { $_.Answer.data -match "v=STSv1" }).Answer.Data
             }
 
             if ($mtaStsTXTRecord -and ($mtaStsTXTRecord -like $txtRecordContent)) {
                 $resultObject.MTA_STS_TXTRecord = "OK"
             }
-            elseif ($mtaStsTXTRecord -and ($mtaStsTXTRecord.strings -notlike $txtRecordContent)) {
+            elseif ($mtaStsTXTRecord -and ($mtaStsTXTRecord -notlike $txtRecordContent)) {
                 $resultObject.MTA_STS_TXTRecord = "TXT record does not contain the expected content. The following content was found: $($mtaStsTXTRecord.strings -join ", ")"
                 $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
             }
@@ -232,18 +233,17 @@ max_age: 604800
             # Check MTA-STS CNAME record
             $mtaStsName = "mta-sts." + $domain
             if ($UseClassicDNS -eq $true) {
-                $cnameRecord = Resolve-PSMTASTSDnsName -Name $mtaStsName -Type CNAME -Server $DnsServer -ErrorAction SilentlyContinue
+                $cnameRecord = (Resolve-PSMTASTSDnsName -Name $mtaStsName -Type CNAME -Server $DnsServer -ErrorAction SilentlyContinue).NameHost
             } else {
-                $cnameRecord = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsName&type=CNAME").Answer.data
                 # Remove the trailing dot from the CNAME record returned by Google DNS
-                $cnameRecord = $cnameRecord.Substring(0, $cnameRecord.Length - 1)
+                $cnameRecord = ((Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsName&type=CNAME").Answer.data).trim(".")
             }
 
-            if ($cnameRecord -and ($resultObject.Host -eq $cnameRecord.NameHost)) {
+            if ($cnameRecord -and ($resultObject.Host -eq $cnameRecord)) {
                 $resultObject.MTA_STS_CNAME = "OK"
             }
-            elseif ($cnameRecord -and ($resultObject.Host -ne $cnameRecord.NameHost)) {
-                $resultObject.MTA_STS_CNAME = "CNAME record does not contain the expected content. The following content was found: $($cnameRecord.NameHost -join ", ")"
+            elseif ($cnameRecord -and ($resultObject.Host -ne $cnameRecord)) {
+                $resultObject.MTA_STS_CNAME = "CNAME record does not contain the expected content. The following content was found: $($cnameRecord -join ", ")"
                 $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
             }
             else {
@@ -252,7 +252,7 @@ max_age: 604800
             }
     
             # Checking MTA-STS Policy
-            $mtaStsUri = "https://mta-sts.{0}/.well-known/mta-sts.txt" -f $domain
+            $mtaStsUri = "https://mta-sts.$domain/.well-known/mta-sts.txt"
             Write-Verbose "...checking MTA-STS Policy file at $mtaStsUri"
             
             try {
@@ -276,10 +276,15 @@ max_age: 604800
             # Checking TLSRPT Record
             # Example: _smtp._tls.example.com. IN TXT "v=TLSRPTv1;rua=mailto:reports@example.com"
             $tlsRptDNSHost = "_smtp._tls." + $domain
-            $tlsRptRecord = Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object -FilterScript { $_.Strings -like "v=TLSRPTv1*" }
+            If ($UseClassicDNS -eq $true) {
+                [string]$tlsRptRecord = (Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -like "v=TLSRPTv1*" }).Strings
+            } else {
+                [string]$tlsRptRecord = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$tlsRptDNSHost&type=TXT" | Where-Object { $_.Answer.data -like "v=TLSRPTv1*" }).Answer.data
+            }
+            # $tlsRptRecord = Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object -FilterScript { $_.Strings -like "v=TLSRPTv1*" }
 
             if ($null -ne $tlsRptRecord) {
-                $resultObject.TLSRPT = $tlsRptRecord.Strings[0]
+                $resultObject.TLSRPT = $tlsRptRecord
             }
 
             # Checking MX Record
