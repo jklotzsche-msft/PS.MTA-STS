@@ -178,8 +178,13 @@ max_age: 604800
 
             if ($UseClassicDNS -eq $true) {
                 $CNameHost = (Resolve-PSMTASTSDnsName -Name "mta-sts.$Domain" -Type "CNAME" -Server $DnsServer).NameHost
-            } else {
-                $CNameHost = ((Invoke-RestMethod -URI "https://dns.google/resolve?name=mta-sts.$Domain&type=CNAME").Answer.data).trim(".")
+            }
+            else {
+                $dnsResponse = Invoke-RestMethod -URI "https://dns.google/resolve?name=mta-sts.$Domain&type=CNAME" -ErrorAction SilentlyContinue
+                $CNameHost = $null
+                if ($dnsResponse -and $dnsResponse.Answer -and $dnsResponse.Answer.data) {
+                    $CNameHost = $dnsResponse.Answer.data.Trim(".")
+                }
             }
             If ($Null -ne $CNameHost) {
                 $Hostname = $CNameHost
@@ -232,9 +237,13 @@ max_age: 604800
             $mtaStsName = "mta-sts." + $domain
             if ($UseClassicDNS -eq $true) {
                 $cnameRecord = (Resolve-PSMTASTSDnsName -Name $mtaStsName -Type CNAME -Server $DnsServer -ErrorAction SilentlyContinue).NameHost
-            } else {
-                # Remove the trailing dot from the CNAME record returned by Google DNS
-                $cnameRecord = ((Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsName&type=CNAME").Answer.data).trim(".")
+            }
+            else {
+                $dnsCNameResponse = Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsName&type=CNAME" -ErrorAction SilentlyContinue
+                $cnameRecord = $null
+                if ($dnsCNameResponse -and $dnsCNameResponse.Answer -and $dnsCNameResponse.Answer.data) {
+                    $cnameRecord = $dnsCNameResponse.Answer.data.Trim(".")
+                }
             }
 
             if ($cnameRecord -and ($resultObject.Host -eq $cnameRecord)) {
