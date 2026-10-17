@@ -354,5 +354,8 @@ max_age: 604800
             Write-Warning "Exporting result to $ResultPath"
             $result | Export-Csv -Path $ResultPath -Encoding UTF8 -Delimiter ";" -NoTypeInformation
         }
+
+        # Return the result array
+        return $result
     }
 }
