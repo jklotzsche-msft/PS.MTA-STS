@@ -210,10 +210,10 @@ max_age: 604800
             # Example: _mta-sts.example.com. IN TXT "v=STSv1; id=20160831085700Z"
             $mtaStsDNSHost = "_mta-sts." + $domain
             If ($UseClassicDNS -eq $true) {
-                $mtaStsTXTRecord = (Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -match "v=STSv1" }).Strings
+                [string]$mtaStsTXTRecord = (Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -match "v=STSv1" }).Strings
             }
             Else {
-                $mtaStsTXTRecord = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDNSHost&type=TXT" | Where-Object { $_.Answer.data -match "v=STSv1" }).Answer.Data
+                [string]$mtaStsTXTRecord = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDNSHost&type=TXT" | Where-Object { $_.Answer.data -match "v=STSv1" }).Answer.Data
             }
 
             if ($mtaStsTXTRecord -and ($mtaStsTXTRecord -like $txtRecordContent)) {
