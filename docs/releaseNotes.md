@@ -21,6 +21,7 @@ The 1.4.0 release of the PS.MTA-STS module includes (but is not limited to) the 
 - Updated tp Pester 6.2.0 --> Thanks to [BohrenAn](https://github.com/BohrenAn)
 - Resolve-PSMTASTSDnsName.ps1 upated to DNS over HTTPS - ([GitHub Issue #40](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/40))
 - Updated Documentation / Readme / Contributing --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- Small changes implemented so it runs also in Linux --> Thanks to [BohrenAn](https://github.com/BohrenAn)
 
 ## Version 1.3.1
 
