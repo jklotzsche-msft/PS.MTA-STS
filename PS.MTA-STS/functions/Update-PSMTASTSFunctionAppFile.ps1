@@ -86,7 +86,7 @@
 
     begin {
         # Set working directory for temporary files
-        $workingDirectory = Join-Path -Path $env:TEMP -ChildPath "PS.MTA-STS_deployment"
+        $workingDirectory = Join-Path -Path  ([System.IO.Path]::GetTempPath()) -ChildPath "PS.MTA-STS_deployment"
 
         # Trap errors
         trap {

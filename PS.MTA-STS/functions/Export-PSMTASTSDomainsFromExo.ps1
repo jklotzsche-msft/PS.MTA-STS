@@ -59,7 +59,7 @@
     [CmdletBinding()]
     param(
         [string]
-        $CsvPath = (Join-Path -Path $env:TEMP -ChildPath "$(Get-Date -Format yyyyMMddhhmmss)_mta-sts-export.csv"),
+        $CsvPath = (Join-Path -Path  ([System.IO.Path]::GetTempPath()) -ChildPath "$(Get-Date -Format yyyyMMddhhmmss)_mta-sts-export.csv"),
 
         [Parameter(ValueFromPipeline = $true)]
         [PSObject[]]
@@ -281,20 +281,43 @@
     }
     
     end {
-        # Output the result in a new PowerShell window
         $domainsToExport = $result
+    
         if ($DisplayResult) {
-            Write-Warning "Please select/highlight the domains you want to configure MTA-STS for in the new PowerShell window and click OK. You can select multiple entries by holding the CTRL key OR by selecting your first entry, then holding the SHIFT key and selecting your last entry."
-            $domainsToExport = $result | Sort-Object -Property MTA_STS_CanBeUsed, Name | Out-GridView -Title "Please select the domains you want to configure MTA-STS for and click OK." -PassThru
+            if ($IsWindows) {
+                Write-Warning "Please select/highlight the domains..."
+                $domainsToExport = $result |
+                    Sort-Object -Property Name |
+                    Out-GridView -Title "Please select the domains you want to configure MTA-STS for and click OK." -PassThru
+            }
+            else {
+                Write-Host "Linux detected: interactive GridView selection is not supported."
+                Write-Host "Select domains by number (comma-separated), or press Enter to export all."
+                $items = @($result | Sort-Object -Property Name)
+    
+                if ($items.Count -gt 0) {
+                    for ($i = 0; $i -lt $items.Count; $i++) {
+                        $item = $items[$i]
+                        Write-Host ("[{0}] {1}" -f ($i + 1), $item.Name)
+                    }
+    
+                    $selection = Read-Host "Enter domain numbers to export (blank = all)"
+                    if ([string]::IsNullOrWhiteSpace($selection)) {
+                        $domainsToExport = $items
+                    }
+                    else {
+                        $indexes = $selection -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^\d+$' } | ForEach-Object { [int]$_ - 1 }
+                        $domainsToExport = @($items[$indexes])
+                    }
+                }
+            }
         }
-
-        # Check if the user selected any domains
+    
         if ($null -eq $domainsToExport) {
             Write-Verbose "No domains selected. Exiting."
             return
         }
-
-        # Export the result to a .csv file
+    
         Write-Warning "Exporting $($domainsToExport.count) domain(s) to $CsvPath"
         $domainsToExport | Export-Csv -Path $CsvPath -Delimiter $CsvDelimiter -Encoding $CsvEncoding -NoTypeInformation -Force
     }

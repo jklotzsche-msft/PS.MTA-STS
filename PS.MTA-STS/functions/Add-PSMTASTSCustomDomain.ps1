@@ -166,7 +166,10 @@
             } else {
                 $mtaStsCName = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDomain&type=CNAME").Answer.data | Where-Object {$_ -like "*.azurewebsites.net."}
                 # Remove trailing dot from the CNAME record
-                $mtaStsCName = $mtaStsCName.Substring(0, $mtaStsCName.Length - 1)
+                If ($Null -ne $mtaStsCName)
+                {
+                    $mtaStsCName = $mtaStsCName.Substring(0, $mtaStsCName.Length - 1)
+                }
             }
 
             # Check, if CNAME record exists

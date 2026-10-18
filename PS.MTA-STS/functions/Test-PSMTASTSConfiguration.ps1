@@ -89,7 +89,7 @@
 
         [Parameter(Mandatory = $false)]
         [String]
-        $ResultPath = (Join-Path -Path $env:TEMP -ChildPath "$(Get-Date -Format yyyyMMddhhmmss)_mta-sts-test-result.csv"),
+        $ResultPath = (Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "$(Get-Date -Format yyyyMMddhhmmss)_mta-sts-test-result.csv"),
 
         [Parameter(Mandatory = $false)]
         [string]
