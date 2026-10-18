@@ -103,7 +103,7 @@
         PSData = @{
 
             # Tags applied to this module. These help with module discovery in online galleries.
-            # Tags = @()
+            Tags = @('ExchangeOnline', 'MTA-STS', 'SMTP', 'EmailSecurity', 'Exchange', 'AzureFunctions', 'Security')
 
             # A URL to the license for this module.
             LicenseUri = 'https://github.com/jklotzsche-msft/PS.MTA-STS/blob/main/LICENSE'
