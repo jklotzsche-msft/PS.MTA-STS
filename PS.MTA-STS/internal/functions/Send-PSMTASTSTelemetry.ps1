@@ -10,23 +10,21 @@
 .PARAMETER TelemetryEndpoint
     The full URL of the telemetry receiver endpoint.
 
-
 .PARAMETER EventType
     The type of the telemetry event, e.g., "AddDomain" or "RemoveDomain".
 
-    .PARAMETER Domain
+.PARAMETER Domain
     The domain name associated with the telemetry event.
 
-.PARAMETER TenantId
-    The tenant ID associated with the telemetry event.
-
 .EXAMPLE
-    Send-PSMTASTSTelemetry -TelemetryEndpoint "https://telemetry.example.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain "contoso.com" -TenantId (Get-AzContext).Tenant.Id
+    Send-PSMTASTSTelemetry -TelemetryEndpoint "https://telemetry.example.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain "contoso.com"
 
     Sends a telemetry event for the added domain contoso.com.
 
-.NOTES
-    Best practice: use UTC timestamps, never throw from telemetry calls, and keep the payload lean so operational failures are not masked by monitoring issues.
+.EXAMPLE
+    Send-PSMTASTSTelemetry -TelemetryEndpoint "https://telemetry.example.azurewebsites.net/telemetry" -EventType "RemoveDomain" -Domain "contoso.com"
+
+    Sends a telemetry event for the removed domain contoso.com.
 
 .LINK
     https://github.com/jklotzsche-msft/PS.MTA-STS
@@ -47,8 +45,18 @@ function Send-PSMTASTSTelemetry {
     $body = $Payload | ConvertTo-Json -Depth 3 -Compress
 
     # Send the telemetry event to the configured endpoint
-    $null = Invoke-RestMethod -Uri $TelemetryEndpoint -Method POST `
-        -Headers @{ "Content-Type" = "application/json" } `
-        -Body $body `
-        -ErrorAction SilentlyContinue  # never block main operation on telemetry failure
+    try {
+        $null = Invoke-RestMethod -Uri $TelemetryEndpoint `
+            -Method POST `
+            -Headers @{ "Content-Type" = "application/json" } `
+            -Body $body `
+            -TimeoutSec 5 `
+            -ErrorAction Stop
+
+        return $true
+    }
+    catch {
+        Write-Warning "Telemetry send failed for domain '$Domain' ($EventType): $($_.Exception.Message)"
+        return $false
+    }
 }

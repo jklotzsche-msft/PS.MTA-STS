@@ -99,6 +99,33 @@
             # Get Function AppSetting for Storage Account
             $FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
 
+            # Get Storage Account mapping from Function App settings
+            $connectionString = $FunctionAppSetting['WEBSITE_CONTENTAZUREFILECONNECTIONSTRING']
+            
+            if ([string]::IsNullOrWhiteSpace($connectionString)) {
+                throw "Function App setting 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING' is missing or empty. Cannot validate Storage Account mapping."
+            }
+            
+            # Parse key/value pairs independent from order
+            $accountNamePair = $connectionString -split ';' |
+                ForEach-Object { $_.Trim() } |
+                Where-Object { $_ -match '^(?i)AccountName=' } |
+                Select-Object -First 1
+            
+            if (-not $accountNamePair) {
+                throw "Could not find 'AccountName' in WEBSITE_CONTENTAZUREFILECONNECTIONSTRING. Cannot safely determine Storage Account."
+            }
+            
+            $FunctionAppStorageAccountName = ($accountNamePair -split '=', 2)[1].Trim()
+            
+            if ([string]::IsNullOrWhiteSpace($FunctionAppStorageAccountName)) {
+                throw "Parsed AccountName is empty in WEBSITE_CONTENTAZUREFILECONNECTIONSTRING. Cannot safely determine Storage Account."
+            }
+            
+            if ($FunctionAppStorageAccountName -ine $StorageAccountName) {
+                throw "Storage Account name '$StorageAccountName' does not match Function App Storage Account '$FunctionAppStorageAccountName'. Aborting to prevent deleting the wrong account."
+            }
+
             # Remove Application Insights instance if it exists and the DoNotRemoveApplicationInsights switch is not set
             if ($DoNotRemoveApplicationInsights -eq $false)
             {
@@ -107,26 +134,25 @@
                 if ($ApplicationInsightsConnectionString -match 'InstrumentationKey=([^;]+)')
                 {
                     $InstrumentationKey = $matches[1]
-                }
 
-                # Remove Application Insights instance if it exists
-                $ApplicationInsights = Get-AzApplicationInsights | Where-Object InstrumentationKey -eq $InstrumentationKey
-                $Null = Remove-AzApplicationInsights -ResourceGroupName $ApplicationInsights.ResourceGroupName -Name $ApplicationInsights.Name -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-                
-                # Delete Smart detector alert rule
-                $SmartDetectorAlertRules = Get-AzResource -ResourceGroupName RG_MTASTS2 -ResourceType "microsoft.alertsmanagement/smartdetectoralertrules" | Where-Object {$_.Name -match "$FunctionAppName"}
-                foreach ($SmartDetectorAlertRule in $SmartDetectorAlertRules) {
-                    $Null = Remove-AzResource -ResourceId $SmartDetectorAlertRule.ResourceId -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                    # Remove Application Insights instance if it exists
+                    $ApplicationInsights = Get-AzApplicationInsights | Where-Object {$_.InstrumentationKey -eq $InstrumentationKey}
+                    if ($null -ne $ApplicationInsights) {
+                        $null = Remove-AzApplicationInsights -ResourceGroupName $($ApplicationInsights.ResourceGroupName) -Name $($ApplicationInsights.Name) -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                    }
+
+                    # Delete Smart detector alert rule
+                    $SmartDetectorAlertRules = Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType "microsoft.alertsmanagement/smartdetectoralertrules" | Where-Object {$_.Name -match "$FunctionAppName"}
+                    foreach ($SmartDetectorAlertRule in $SmartDetectorAlertRules) {
+                        $null = Remove-AzResource -ResourceId $SmartDetectorAlertRule.ResourceId -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                    }
                 }
             }
 
             # Get Certificates associated with the Function App
             Write-Verbose "Removing Certificates from Resource Group $ResourceGroupName."
-            $webApp = Get-AzWebApp -ResourceGroupName RG_MTASTS2 -Name IRGENDWOIMINTERNET-MTASTS
+            $webApp = Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName
             $CertName = ($webApp.HostNameSslStates |  Where-Object { $_.Thumbprint }).Name
-
-            # Get Storage Account
-            $StorageAccountName = $FunctionAppSetting.WEBSITE_CONTENTAZUREFILECONNECTIONSTRING.split(";")[1].Replace("AccountName=", "")
 
             # Delete Function App
             Write-Verbose "Deleting Function App $FunctionAppName in Resource Group $ResourceGroupName"
@@ -141,16 +167,17 @@
             $null = Remove-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $AppServicePlan -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
 
             # Remove Certificates from the Resource Group
-            $Certificates = Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType "Microsoft.Web/certificates"
-            foreach ($Certificate in $Certificates)
-            {
-                If ($Certificate.Name -match $CertName)
+            if ($null -ne $CertName) {
+                $Certificates = Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType "Microsoft.Web/certificates"
+                foreach ($Certificate in $Certificates)
                 {
-                    $Null = Remove-AzResource -ResourceId $Certificate.ResourceId -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-                    Write-Verbose "Removed Certificate $($Certificate.Name) from Resource Group $ResourceGroupName."
+                    If ($Certificate.Name -match $CertName)
+                    {
+                        $null = Remove-AzResource -ResourceId $Certificate.ResourceId -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                        Write-Verbose "Removed Certificate $($Certificate.Name) from Resource Group $ResourceGroupName."
+                    }
                 }
             }
-
         }
     }
 

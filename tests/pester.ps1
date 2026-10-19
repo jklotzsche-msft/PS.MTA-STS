@@ -19,7 +19,7 @@ Import-Module "$PSScriptRoot\..\PS.MTA-STS\PS.MTA-STS.psd1"
 Import-Module "$PSScriptRoot\..\PS.MTA-STS\PS.MTA-STS.psm1" -Force
 
 # Need to import explicitly so we can use the configuration class
-Import-Module Pester -MinimumVersion 6.2.0
+Import-Module Pester -MinimumVersion 6.2.0 -DisableNameChecking
 
 Write-Host  "Creating test result folder"
 $null = New-Item -Path "$PSScriptRoot\.." -Name TestResults -ItemType Directory -Force
@@ -34,7 +34,7 @@ $config.Output.Verbosity = 'Detailed'
 $config.TestResult.Enabled = $true
 $config.TestResult.OutputPath = "$PSScriptRoot\..\TestResults\TEST-results.xml"
 
-Invoke-Pester -Configuration $config
+#Invoke-Pester -Configuration $config
 
 #region Run General Tests
 if ($TestGeneral)

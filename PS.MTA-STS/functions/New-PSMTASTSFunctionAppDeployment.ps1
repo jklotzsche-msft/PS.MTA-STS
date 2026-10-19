@@ -195,190 +195,191 @@
     }
     
     process {
-        # Check, if Location is valid
-        Write-Verbose "Checking if location '$($Location)' is valid."
-        $validLocations = Get-AzLocation | Select-Object -ExpandProperty location
-        if (-not ($Location -in $validLocations)) {
-            throw "Location '$($Location)' is not valid. Please provide one of the following values: $($validLocations -join ', ')"
-        }
-
-        # Create, if resource group doesn't exist already. If it doesn't exist, create it.
-        Write-Verbose "Checking if ResourceGroup '$ResourceGroupName' already exists"
-        if ($null -eq (Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue)) {
-            Write-Verbose "Creating Azure Resource Group '$ResourceGroupName'..."
-            if ($PSCmdlet.ShouldProcess("Resource Group $ResourceGroupName", "Create")) {
-                $null = New-AzResourceGroup -Name $ResourceGroupName -Location $Location
-            }
-        }
-
-        # Set default resource group for future cmdlets in this powershell session
-        $null = Set-AzDefault -ResourceGroupName $ResourceGroupName
-
-        # Check, if PlanName is valid, if provided
-        if ($PlanName) {
-            $appServicePlanResult = Get-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $PlanName -ErrorAction SilentlyContinue
-            if ($null -eq $appServicePlanResult) {
-                throw "App Service Plan '$PlanName' does not exist in Resource Group '$ResourceGroupName'. Please provide a valid App Service Plan."
-            }
-        }
-
-        # Check Resource Provider
-        $ResourceProvider = Get-AzResourceProvider
-        $MicrosoftWeb = $ResourceProvider | Where-Object { $_.ProviderNamespace -eq "Microsoft.Web" }
-        if ($Null -eq $MicrosoftWeb) {
-            #Resource Provicer Microsoft.Web not registered
-            if ($RegisterResourceProvider -eq $true) {
-                Register-AzResourceProvider -ProviderNamespace Microsoft.Web
-            }
-            else {
-                Write-Warning -Message "Azure Resource Provider 'Microsoft.Web' is not registered. Please register the Azure Resource Provider 'Microsoft.Web' manually afterwards. See https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-providers-and-types#register-resource-provider for more information."
-            }
-        }
-
-        # Check if Storage StorageAccountName already exists
-        If ($UseClassicDNS -eq $true) {
-            $storageAccountDnsResult = Resolve-PSMTASTSDnsName -Name "$StorageAccountName.blob.core.windows.net" -Type A -Server $DnsServer
-        } else {
-            $storageAccountDnsResult = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$StorageAccountName.blob.core.windows.net&type=A").Answer.data
-        }
-
-        if ($null -ne $storageAccountDnsResult) {
-            $StorageAccounts = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName
-
-            # Check, if Storage Account exists already
-            if (($StorageAccounts.StorageAccountName.count -eq 1 -and $StorageAccounts.StorageAccountName -eq $StorageAccountName) -or ($StorageAccounts.StorageAccountName.count -gt 1 -and $StorageAccounts.StorageAccountName -contains $StorageAccountName)) {
-                # Single Storage Account found
-                Write-Verbose -Message "Existing Storage Account found in Resource Group"
-                [bool]$ExistingStorageAccount = $true
-            }
-            else {
-                throw "Storage Account exists somewhere else. Please provide a different name for the Storage Account."
-            }
-        }
-        else {
-            Write-Verbose -Message "Storage Account does not exist. Will be created."
-            [bool]$ExistingStorageAccount = $false
-        }
-
-        # Check, if FunctionApp exists already
-        If ($UseClassicDNS -eq $true) {
-            $functionAppDnsResult = Resolve-PSMTASTSDnsName -Name "$FunctionAppName.azurewebsites.net" -Type A -Server $DnsServer
-        } else {
-            $functionAppDnsResult = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$FunctionAppName.azurewebsites.net&type=A").Answer.data
-        }
-        if ($null -ne $functionAppDnsResult) {
-            throw "Function App already exists. Please provide a different name for the Function Account."
-        }
-
-        if ($ExistingStorageAccount -ne $true) {
-            # Create Storage Account
-            Write-Verbose "Creating Azure Storage Account $StorageAccountName..."
-            $newAzStorageAccountProps = @{
-                ResourceGroupName      = $ResourceGroupName
-                Name                   = $StorageAccountName
-                Location               = $Location
-                SkuName                = 'Standard_LRS'
-                AllowBlobPublicAccess  = $false
-                EnableHttpsTrafficOnly = $true
-                MinimumTlsVersion      = "TLS1_2"
-                EnableSftp             = $false
-            }
-            if ($PSCmdlet.ShouldProcess("Storage Account $StorageAccountName", "Create")) {
-                $null = New-AzStorageAccount @newAzStorageAccountProps -WarningAction SilentlyContinue
-            }
-        }
-
-        # Enable soft delete for blobs
         try {
-            $ctx = New-AzStorageContext -StorageAccountName $StorageAccountName -WarningAction SilentlyContinue
-            $null = Enable-AzStorageDeleteRetentionPolicy -RetentionDays $StorageDeleteRetentionInDays -Context $ctx -WarningAction SilentlyContinue
-        }
-        catch {
-            Write-Warning "Could not enable soft delete for blobs in Storage Account $StorageAccountName. Please enable it manually, if needed."
+                # Check, if Location is valid
+                Write-Verbose "Checking if location '$($Location)' is valid."
+                $validLocations = Get-AzLocation | Select-Object -ExpandProperty location
+                if (-not ($Location -in $validLocations)) {
+                    throw "Location '$($Location)' is not valid. Please provide one of the following values: $($validLocations -join ', ')"
+                }
+
+                # Create, if resource group doesn't exist already. If it doesn't exist, create it.
+                Write-Verbose "Checking if ResourceGroup '$ResourceGroupName' already exists"
+                if ($null -eq (Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue)) {
+                    Write-Verbose "Creating Azure Resource Group '$ResourceGroupName'..."
+                    if ($PSCmdlet.ShouldProcess("Resource Group $ResourceGroupName", "Create")) {
+                        $null = New-AzResourceGroup -Name $ResourceGroupName -Location $Location
+                    }
+                }
+
+                # Set default resource group for future cmdlets in this powershell session
+                $null = Set-AzDefault -ResourceGroupName $ResourceGroupName
+
+                # Check, if PlanName is valid, if provided
+                if ($PlanName) {
+                    $appServicePlanResult = Get-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $PlanName -ErrorAction SilentlyContinue
+                    if ($null -eq $appServicePlanResult) {
+                        throw "App Service Plan '$PlanName' does not exist in Resource Group '$ResourceGroupName'. Please provide a valid App Service Plan."
+                    }
+                }
+
+                # Check Resource Provider
+                $ResourceProvider = Get-AzResourceProvider
+                $MicrosoftWeb = $ResourceProvider | Where-Object { $_.ProviderNamespace -eq "Microsoft.Web" }
+                if ($Null -eq $MicrosoftWeb) {
+                    #Resource Provicer Microsoft.Web not registered
+                    if ($RegisterResourceProvider -eq $true) {
+                        Register-AzResourceProvider -ProviderNamespace Microsoft.Web
+                    }
+                    else {
+                        Write-Warning -Message "Azure Resource Provider 'Microsoft.Web' is not registered. Please register the Azure Resource Provider 'Microsoft.Web' manually afterwards. See https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-providers-and-types#register-resource-provider for more information."
+                    }
+                }
+
+                # Check if Storage StorageAccountName already exists
+                If ($UseClassicDNS -eq $true) {
+                    $storageAccountDnsResult = Resolve-PSMTASTSDnsName -Name "$StorageAccountName.blob.core.windows.net" -Type A -Server $DnsServer
+                } else {
+                    $storageAccountDnsResult = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$StorageAccountName.blob.core.windows.net&type=A").Answer.data
+                }
+
+                if ($null -ne $storageAccountDnsResult) {
+                    $StorageAccounts = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName
+
+                    # Check, if Storage Account exists already
+                    if (($StorageAccounts.StorageAccountName.count -eq 1 -and $StorageAccounts.StorageAccountName -eq $StorageAccountName) -or ($StorageAccounts.StorageAccountName.count -gt 1 -and $StorageAccounts.StorageAccountName -contains $StorageAccountName)) {
+                        # Single Storage Account found
+                        Write-Verbose -Message "Existing Storage Account found in Resource Group"
+                        [bool]$ExistingStorageAccount = $true
+                    }
+                    else {
+                        throw "Storage Account exists somewhere else. Please provide a different name for the Storage Account."
+                    }
+                }
+                else {
+                    Write-Verbose -Message "Storage Account does not exist. Will be created."
+                    [bool]$ExistingStorageAccount = $false
+                }
+
+                # Check, if FunctionApp exists already
+                If ($UseClassicDNS -eq $true) {
+                    $functionAppDnsResult = Resolve-PSMTASTSDnsName -Name "$FunctionAppName.azurewebsites.net" -Type A -Server $DnsServer
+                } else {
+                    $functionAppDnsResult = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$FunctionAppName.azurewebsites.net&type=A").Answer.data
+                }
+                if ($null -ne $functionAppDnsResult) {
+                    throw "Function App already exists. Please provide a different name for the Function Account."
+                }
+
+                if ($ExistingStorageAccount -ne $true) {
+                    # Create Storage Account
+                    Write-Verbose "Creating Azure Storage Account $StorageAccountName..."
+                    $newAzStorageAccountProps = @{
+                        ResourceGroupName      = $ResourceGroupName
+                        Name                   = $StorageAccountName
+                        Location               = $Location
+                        SkuName                = 'Standard_LRS'
+                        AllowBlobPublicAccess  = $false
+                        EnableHttpsTrafficOnly = $true
+                        MinimumTlsVersion      = "TLS1_2"
+                        EnableSftp             = $false
+                    }
+                    if ($PSCmdlet.ShouldProcess("Storage Account $StorageAccountName", "Create")) {
+                        $null = New-AzStorageAccount @newAzStorageAccountProps -WarningAction SilentlyContinue
+                    }
+                }
+
+                # Enable soft delete for blobs
+                try {
+                    $ctx = New-AzStorageContext -StorageAccountName $StorageAccountName -WarningAction SilentlyContinue
+                    $null = Enable-AzStorageDeleteRetentionPolicy -RetentionDays $StorageDeleteRetentionInDays -Context $ctx -WarningAction SilentlyContinue
+                }
+                catch {
+                    Write-Warning "Could not enable soft delete for blobs in Storage Account $StorageAccountName. Please enable it manually, if needed."
+                    [System.Threading.Thread]::CurrentThread.CurrentCulture = $CurrentCulture
+                }
+
+                # Create Function App
+                Write-Verbose "Creating Azure Function App $FunctionAppName..."
+                $newAzFunctionAppProps = @{
+                    ResourceGroupName  = $ResourceGroupName
+                    Name               = $FunctionAppName
+                    Runtime            = 'PowerShell'
+                    StorageAccountName = $StorageAccountName
+                    FunctionsVersion   = '4'
+                    OSType             = 'Windows'
+                    RuntimeVersion     = '7.6'
+                }
+                # If PlanName is provided, you cannot set the Location anymore.
+                # Therefore, we set the PlanName and don't set the Location, if PlanName is provided.
+                if ($PlanName) {
+                    # Add App Service Plan, if provided
+                    $newAzFunctionAppProps.PlanName = $PlanName
+                }
+                else {
+                    $newAzFunctionAppProps.Location = $Location
+                }
+                # Disable Application Insights, if provided
+                if ($EnableApplicationInsights) {
+                    $newAzFunctionAppProps.DisableApplicationInsights = $false
+                } else {
+                    $newAzFunctionAppProps.DisableApplicationInsights = $true
+                }
+
+                # Create Function App
+                if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Create")) {
+                    $null = New-AzFunctionApp @newAzFunctionAppProps -WarningAction SilentlyContinue
+                }
+
+                # Wait for Function App to be ready
+                Write-Verbose "Waiting for Azure Function App $FunctionAppName to be ready..."
+                $null = Start-Sleep -Seconds 60
+
+                # Set FTP disabled
+                Write-Verbose "Disabling FTP for Azure Function App $($FunctionAppName)..."
+                if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update runtime/security settings")) {
+                    $null = Set-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -FtpsState Disabled -WarningAction SilentlyContinue
+                }
+
+                # Set TLS Version 1.2 and PowerShell Version 7.6
+                Write-Verbose "Setting TLS Version to 1.2 / PowerShell Version to 7.6"
+                if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update TLS 1.2 and PowerShell 7.6")) {
+                    $subscriptionId = (Get-AzContext).Subscription.Id
+                    $body = @{
+                        properties = @{
+                            minTlsVersion     = "1.2"
+                            scmMinTlsVersion  = "1.2"
+                        }
+                    } | ConvertTo-Json -Depth 3
+
+                    $path = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Web/sites/$FunctionAppName/config/web?api-version=2026-07-15"
+                    $null = Invoke-AzRestMethod -Method PATCH -Path $path -Payload $body -WarningAction SilentlyContinue
+                }
+
+                # Remove AzureWebJobsDashboard, as it is deprecated
+                $functionAppSettingsToRemove = @("AzureWebJobsDashboard")
+                $FunctionAppSettings = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName
+                foreach ($functionAppSettingToRemove in $functionAppSettingsToRemove) {
+                    if ($FunctionAppSettings.Keys -contains $functionAppSettingToRemove) {
+                        Write-Verbose "Remove $functionAppSettingToRemove App Setting from Function App $FunctionAppName..."
+                        Remove-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -AppSettingName $functionAppSettingToRemove -Confirm:$false -Force -WarningAction SilentlyContinue
+                    }
+                }
+
+                # Update the Azure Function App files with the latest PowerShell code
+                $updateFunctionAppProps = @{
+                    ResourceGroupName = $ResourceGroupName
+                    FunctionAppName   = $FunctionAppName
+                    PolicyMode        = $PolicyMode
+                }
+                if ($ExoHostName) {
+                    $updateFunctionAppProps.ExoHostName = $ExoHostName
+                }
+                if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update")) {
+                    $null = Update-PSMTASTSFunctionAppFile @updateFunctionAppProps -WarningAction SilentlyContinue
+                }
+        } finally {
             [System.Threading.Thread]::CurrentThread.CurrentCulture = $CurrentCulture
         }
-
-        # Create Function App
-        Write-Verbose "Creating Azure Function App $FunctionAppName..."
-        $newAzFunctionAppProps = @{
-            ResourceGroupName  = $ResourceGroupName
-            Name               = $FunctionAppName
-            Runtime            = 'PowerShell'
-            StorageAccountName = $StorageAccountName
-            FunctionsVersion   = '4'
-            OSType             = 'Windows'
-            RuntimeVersion     = '7.6'
-        }
-        # If PlanName is provided, you cannot set the Location anymore.
-        # Therefore, we set the PlanName and don't set the Location, if PlanName is provided.
-        if ($PlanName) {
-            # Add App Service Plan, if provided
-            $newAzFunctionAppProps.PlanName = $PlanName
-        }
-        else {
-            $newAzFunctionAppProps.Location = $Location
-        }
-        # Disable Application Insights, if provided
-        if ($EnableApplicationInsights) {
-            $newAzFunctionAppProps.DisableApplicationInsights = $false
-        } else {
-            $newAzFunctionAppProps.DisableApplicationInsights = $true
-        }
-
-        # Create Function App
-        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Create")) {
-            $null = New-AzFunctionApp @newAzFunctionAppProps -WarningAction SilentlyContinue
-        }
-
-        # Wait for Function App to be ready
-        Write-Verbose "Waiting for Azure Function App $FunctionAppName to be ready..."
-        $null = Start-Sleep -Seconds 60
-
-        # Set FTP disabled
-        Write-Verbose "Disabling FTP for Azure Function App $($FunctionAppName)..."
-        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update runtime/security settings")) {
-            $null = Set-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -FtpsState Disabled -WarningAction SilentlyContinue
-        }
-
-        # Set TLS Version 1.2 and PowerShell Version 7.6
-        Write-Verbose "Setting TLS Version to 1.2 / PowerShell Version to 7.6"
-        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update TLS 1.2 and PowerShell 7.6")) {
-            $subscriptionId = (Get-AzContext).Subscription.Id
-            $body = @{
-                properties = @{
-                    minTlsVersion     = "1.2"
-                    scmMinTlsVersion  = "1.2"
-                }
-            } | ConvertTo-Json -Depth 3
-
-            $path = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Web/sites/$FunctionAppName/config/web?api-version=2026-07-15"
-            $null = Invoke-AzRestMethod -Method PATCH -Path $path -Payload $body -WarningAction SilentlyContinue
-        }
-
-        # Remove AzureWebJobsDashboard, as it is deprecated
-        $functionAppSettingsToRemove = @("AzureWebJobsDashboard")
-        $FunctionAppSettings = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName
-        foreach ($functionAppSettingToRemove in $functionAppSettingsToRemove) {
-            if ($FunctionAppSettings.Keys -contains $functionAppSettingToRemove) {
-                Write-Verbose "Remove $functionAppSettingToRemove App Setting from Function App $FunctionAppName..."
-                Remove-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -AppSettingName $functionAppSettingToRemove -Confirm:$false -Force -WarningAction SilentlyContinue
-            }
-        }
-
-        # Update the Azure Function App files with the latest PowerShell code
-        $updateFunctionAppProps = @{
-            ResourceGroupName = $ResourceGroupName
-            FunctionAppName   = $FunctionAppName
-            PolicyMode        = $PolicyMode
-        }
-        if ($ExoHostName) {
-            $updateFunctionAppProps.ExoHostName = $ExoHostName
-        }
-        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update")) {
-            $null = Update-PSMTASTSFunctionAppFile @updateFunctionAppProps -WarningAction SilentlyContinue
-        }
-
-        # Restore the original culture for the current thread
-        [System.Threading.Thread]::CurrentThread.CurrentCulture = $CurrentCulture
     }
 }

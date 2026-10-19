@@ -160,6 +160,14 @@
             $null = Set-AzWebApp @setAzWebApp -WarningAction SilentlyContinue
         }
 
+        # Send telemetry event for actually removed custom domains (skip in WhatIf mode)
+        if ($SendTelemetry -and -not $WhatIfPreference) {
+            foreach ($RemovedCustomDomain in $removeCustomDomains) {
+                $domainName = $RemovedCustomDomain -replace '^mta-sts\.', ''
+                Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "RemoveDomain" -Domain $domainName
+            }
+        }
+
         #Remove Managed Certificate if needed
         Write-Verbose "Remove Certificates"
         [Array]$webAppCertificates = Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName
@@ -176,14 +184,6 @@
                     # If we do not continue anyways, users would have to remove the certificate manually for next domains
                     $null = Remove-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ThumbPrint $thumbprint -Confirm:$false -ErrorAction Continue
                 }
-            }
-        }
-
-        # Send telemetry event for removed custom domains
-        if ($SendTelemetry -eq $true) {
-            Foreach ($DomainName in $DomainList)
-            {
-                Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "RemoveDomain" -Domain $DomainName
             }
         }
     }

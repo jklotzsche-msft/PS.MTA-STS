@@ -218,6 +218,14 @@
             $null = Set-AzWebApp @setAzWebApp -WarningAction SilentlyContinue
         }
 
+        # Send telemetry event for actually added custom domains
+        if ($SendTelemetry -and -not $WhatIfPreference) {
+            foreach ($AddedCustomDomain in $newCustomDomainsToAdd) {
+                $domainName = $AddedCustomDomain -replace '^mta-sts\.', ''
+                Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain $domainName
+            }
+        }
+
         # Stop here, if we should not add managed certificate
         if ($DoNotAddManagedCertificate) {
             Write-Verbose "Managed certificate will not be added to Function App $FunctionAppName."
@@ -238,14 +246,6 @@
             }
             if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Add certificate for $newCustomDomainToAdd")) {
                 $null = New-AzWebAppCertificate @newAzWebAppCertificate -WarningAction SilentlyContinue
-            }
-        }
-
-        # Send telemetry event for added custom domains
-        if ($SendTelemetry -eq $true) {
-            Foreach ($DomainName in $domainList)
-            {
-                Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain $DomainName
             }
         }
     }

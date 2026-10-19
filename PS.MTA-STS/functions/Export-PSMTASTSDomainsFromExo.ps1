@@ -173,7 +173,7 @@
             # Example: _mta-sts.example.com. IN TXT "v=STSv1; id=20160831085700Z"
             $mtaStsDNSHost = "_mta-sts." + $acceptedDomain.DomainName
             If ($UseClassicDNS) {
-                $mtaStsTXTRecord = Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer | Where-Object { $_.Strings -match "v=STSv1" }
+                $mtaStsTXTRecord = (Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer | Where-Object { $_.Strings -match "v=STSv1" }).Strings
             }
             Else {
                 $DNSAnswer = Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDNSHost&type=TXT"
@@ -181,7 +181,7 @@
             }
 
             if ($null -ne $mtaStsTXTRecord) {
-                $resultObject.MTA_STS_TXTRecord = $mtaStsTXTRecord.strings -join " | " # Strings are joined, because multiple strings can be returned
+                $resultObject.MTA_STS_TXTRecord = $mtaStsTXTRecord -join " | " # Strings are joined, because multiple strings can be returned
             }
 
             # Checking MTA-STS Policy
@@ -212,7 +212,6 @@
             Else {
                 $DNSAnswer = Invoke-RestMethod -URI "https://dns.google/resolve?name=$tlsRptDNSHost&type=TXT"
                 $tlsRptRecord = $DNSAnswer.Answer.data | Where-Object {$_ -match "v=TLSRPTv1"}
-                # $tlsRptRecord = Resolve-DnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -like "v=TLSRPTv1*" }
             }
 
             if ($null -ne $tlsRptRecord) {
@@ -284,13 +283,15 @@
         $domainsToExport = $result
     
         if ($DisplayResult) {
-            if ($IsWindows) {
+            if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows) -eq $true) {
+                # Windows
                 Write-Warning "Please select/highlight the domains..."
                 $domainsToExport = $result |
                     Sort-Object -Property Name |
                     Out-GridView -Title "Please select the domains you want to configure MTA-STS for and click OK." -PassThru
             }
             else {
+                # MacOS/Linux
                 Write-Host "Linux detected: interactive GridView selection is not supported."
                 Write-Host "Select domains by number (comma-separated), or press Enter to export all."
                 $items = @($result | Sort-Object -Property Name)

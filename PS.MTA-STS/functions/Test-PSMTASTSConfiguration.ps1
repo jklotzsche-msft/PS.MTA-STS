@@ -81,7 +81,7 @@
 
         [Parameter(Mandatory = $false)]
         [Bool]
-        $DisplayResult = $true,
+        $DisplayResult = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows),
 
         [Parameter(Mandatory = $false)]
         [Switch]
@@ -215,17 +215,33 @@ max_age: 604800
             # Example: _mta-sts.example.com. IN TXT "v=STSv1; id=20160831085700Z"
             $mtaStsDNSHost = "_mta-sts." + $domain
             If ($UseClassicDNS -eq $true) {
-                [string]$mtaStsTXTRecord = (Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -match "v=STSv1" }).Strings
+                $mtaStsTXTRecord = (Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -match "v=STSv1" }).Strings
+                If ($Null -ne $mtaStsTXTRecord)
+                {
+                    If ($mtaStsTXTRecord.Count -gt 1) {
+                        Throw "Multiple MTA-STS TXT records found for $mtaStsDNSHost"
+                    } else {
+                        $mtaStsTXTRecord = $mtaStsTXTRecord.Replace('"', '')
+                    }
+                }
             }
             Else {
-                [string]$mtaStsTXTRecord = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDNSHost&type=TXT" | Where-Object { $_.Answer.data -match "v=STSv1" }).Answer.Data
+                $mtaStsTXTRecord = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDNSHost&type=TXT" | Where-Object { $_.Answer.data -match "v=STSv1" }).Answer.Data
+                If ($Null -ne $mtaStsTXTRecord)
+                {
+                    If ($mtaStsTXTRecord.Count -gt 1){
+                        Throw "Multiple MTA-STS TXT records found for $mtaStsDNSHost"
+                    } else {
+                        $mtaStsTXTRecord = $mtaStsTXTRecord.Replace('"', '')
+                    }
+                }
             }
 
             if ($mtaStsTXTRecord -and ($mtaStsTXTRecord -like $txtRecordContent)) {
                 $resultObject.MTA_STS_TXTRecord = "OK"
             }
             elseif ($mtaStsTXTRecord -and ($mtaStsTXTRecord -notlike $txtRecordContent)) {
-                $resultObject.MTA_STS_TXTRecord = "TXT record does not contain the expected content. The following content was found: $($mtaStsTXTRecord.strings -join ", ")"
+                $resultObject.MTA_STS_TXTRecord = "TXT record does not contain the expected content. The following content was found: $($mtaStsTXTRecord -join ", ")"
                 $resultObject.MTA_STS_OVERALL = "ISSUE_FOUND"
             }
             else {
@@ -284,11 +300,25 @@ max_age: 604800
             # Example: _smtp._tls.example.com. IN TXT "v=TLSRPTv1;rua=mailto:reports@example.com"
             $tlsRptDNSHost = "_smtp._tls." + $domain
             If ($UseClassicDNS -eq $true) {
-                [string]$tlsRptRecord = (Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -like "v=TLSRPTv1*" }).Strings
+                $tlsRptRecord = (Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -like "v=TLSRPTv1*" }).Strings
+                If ($Null -ne $tlsRptRecord)
+                {
+                    If ($tlsRptRecord.Count -gt 1) {
+                        Throw "Multiple TLSRPT TXT records found for $tlsRptDNSHost"
+                    } else {
+                        $tlsRptRecord = $tlsRptRecord.Replace('"', '')
+                    }
+                }
             } else {
-                [string]$tlsRptRecord = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$tlsRptDNSHost&type=TXT" | Where-Object { $_.Answer.data -like "v=TLSRPTv1*" }).Answer.data
+                $tlsRptRecord = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$tlsRptDNSHost&type=TXT" | Where-Object { $_.Answer.data -like "v=TLSRPTv1*" }).Answer.data
+                If ($Null -ne $tlsRptRecord){
+                    If ($tlsRptRecord.Count -gt 1) {
+                        Throw "Multiple TLSRPT TXT records found for $tlsRptDNSHost"
+                    } else {
+                        $tlsRptRecord = $tlsRptRecord.Replace('"', '')
+                    }
+                }
             }
-            # $tlsRptRecord = Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object -FilterScript { $_.Strings -like "v=TLSRPTv1*" }
 
             if ($null -ne $tlsRptRecord) {
                 $resultObject.TLSRPT = $tlsRptRecord

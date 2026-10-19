@@ -49,6 +49,7 @@
         'Az.Resources',
         'Az.Storage',
         'Az.Websites',
+        'Az.ApplicationInsights',
         'ExchangeOnlineManagement'
     )
 
