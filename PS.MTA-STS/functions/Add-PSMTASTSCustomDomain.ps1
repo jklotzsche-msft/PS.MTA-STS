@@ -222,7 +222,7 @@
         if ($SendTelemetry -and -not $WhatIfPreference) {
             foreach ($AddedCustomDomain in $newCustomDomainsToAdd) {
                 $domainName = $AddedCustomDomain -replace '^mta-sts\.', ''
-                Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain $domainName
+                $null = Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain $domainName
             }
         }
 

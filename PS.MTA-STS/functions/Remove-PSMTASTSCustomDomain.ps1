@@ -164,7 +164,7 @@
         if ($SendTelemetry -and -not $WhatIfPreference) {
             foreach ($RemovedCustomDomain in $removeCustomDomains) {
                 $domainName = $RemovedCustomDomain -replace '^mta-sts\.', ''
-                Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "RemoveDomain" -Domain $domainName
+                $null =Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "RemoveDomain" -Domain $domainName
             }
         }
 
