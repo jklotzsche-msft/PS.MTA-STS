@@ -5,30 +5,30 @@ It expects as input an ApiKey authorized to publish the module.
 Insert any build steps you may need to take before publishing it here.
 #>
 param (
-	$ApiKey,
-	
-	$WorkingDirectory,
-	
-	$Repository = 'PSGallery',
-	
-	[switch]
-	$LocalRepo,
-	
-	[switch]
-	$SkipPublish,
-	
-	[switch]
-	$AutoVersion
+    $ApiKey,
+    
+    $WorkingDirectory,
+    
+    $Repository = 'PSGallery',
+    
+    [switch]
+    $LocalRepo,
+    
+    [switch]
+    $SkipPublish,
+    
+    [switch]
+    $AutoVersion
 )
 
 #region Handle Working Directory Defaults
 if (-not $WorkingDirectory)
 {
-	if ($env:RELEASE_PRIMARYARTIFACTSOURCEALIAS)
-	{
-		$WorkingDirectory = Join-Path -Path $env:SYSTEM_DEFAULTWORKINGDIRECTORY -ChildPath $env:RELEASE_PRIMARYARTIFACTSOURCEALIAS
-	}
-	else { $WorkingDirectory = $env:SYSTEM_DEFAULTWORKINGDIRECTORY }
+    if ($env:RELEASE_PRIMARYARTIFACTSOURCEALIAS)
+    {
+        $WorkingDirectory = Join-Path -Path $env:SYSTEM_DEFAULTWORKINGDIRECTORY -ChildPath $env:RELEASE_PRIMARYARTIFACTSOURCEALIAS
+    }
+    else { $WorkingDirectory = $env:SYSTEM_DEFAULTWORKINGDIRECTORY }
 }
 if (-not $WorkingDirectory) { $WorkingDirectory = Split-Path $PSScriptRoot }
 #endregion Handle Working Directory Defaults
@@ -43,15 +43,15 @@ $text = @()
 
 # Gather commands
 Get-ChildItem -Path "$($publishDir.FullName)\PS.MTA-STS\internal\functions\" -Recurse -File -Filter "*.ps1" | ForEach-Object {
-	$text += [System.IO.File]::ReadAllText($_.FullName)
+    $text += [System.IO.File]::ReadAllText($_.FullName)
 }
 Get-ChildItem -Path "$($publishDir.FullName)\PS.MTA-STS\functions\" -Recurse -File -Filter "*.ps1" | ForEach-Object {
-	$text += [System.IO.File]::ReadAllText($_.FullName)
+    $text += [System.IO.File]::ReadAllText($_.FullName)
 }
 
 # Gather scripts
 Get-ChildItem -Path "$($publishDir.FullName)\PS.MTA-STS\internal\scripts\" -Recurse -File -Filter "*.ps1" | ForEach-Object {
-	$text += [System.IO.File]::ReadAllText($_.FullName)
+    $text += [System.IO.File]::ReadAllText($_.FullName)
 }
 
 #region Update the psm1 file & Cleanup
@@ -63,19 +63,19 @@ Remove-Item -Path "$($publishDir.FullName)\PS.MTA-STS\functions" -Recurse -Force
 #region Updating the Module Version
 if ($AutoVersion)
 {
-	Write-Host  "Updating module version numbers."
-	try { [version]$remoteVersion = (Find-Module 'PS.MTA-STS' -Repository $Repository -ErrorAction Stop).Version }
-	catch
-	{
-		throw "Failed to access $($Repository) : $_"
-	}
-	if (-not $remoteVersion)
-	{
-		throw "Couldn't find PS.MTA-STS on repository $($Repository) : $_"
-	}
-	$newBuildNumber = $remoteVersion.Build + 1
-	[version]$localVersion = (Import-PowerShellDataFile -Path "$($publishDir.FullName)\PS.MTA-STS\PS.MTA-STS.psd1").ModuleVersion
-	Update-ModuleManifest -Path "$($publishDir.FullName)\PS.MTA-STS\PS.MTA-STS.psd1" -ModuleVersion "$($localVersion.Major).$($localVersion.Minor).$($newBuildNumber)"
+    Write-Host  "Updating module version numbers."
+    try { [version]$remoteVersion = (Find-Module 'PS.MTA-STS' -Repository $Repository -ErrorAction Stop).Version }
+    catch
+    {
+        throw "Failed to access $($Repository) : $_"
+    }
+    if (-not $remoteVersion)
+    {
+        throw "Couldn't find PS.MTA-STS on repository $($Repository) : $_"
+    }
+    $newBuildNumber = $remoteVersion.Build + 1
+    [version]$localVersion = (Import-PowerShellDataFile -Path "$($publishDir.FullName)\PS.MTA-STS\PS.MTA-STS.psd1").ModuleVersion
+    Update-ModuleManifest -Path "$($publishDir.FullName)\PS.MTA-STS\PS.MTA-STS.psd1" -ModuleVersion "$($localVersion.Major).$($localVersion.Minor).$($newBuildNumber)"
 }
 #endregion Updating the Module Version
 
@@ -83,16 +83,16 @@ if ($AutoVersion)
 if ($SkipPublish) { return }
 if ($LocalRepo)
 {
-	# Dependencies must go first
-	Write-Host  "Creating Nuget Package for module: PSFramework"
-	New-PSMDModuleNugetPackage -ModulePath (Get-Module -Name PSFramework).ModuleBase -PackagePath .
-	Write-Host  "Creating Nuget Package for module: PS.MTA-STS"
-	New-PSMDModuleNugetPackage -ModulePath "$($publishDir.FullName)\PS.MTA-STS" -PackagePath .
+    # Dependencies must go first
+    Write-Host  "Creating Nuget Package for module: PSFramework"
+    New-PSMDModuleNugetPackage -ModulePath (Get-Module -Name PSFramework).ModuleBase -PackagePath .
+    Write-Host  "Creating Nuget Package for module: PS.MTA-STS"
+    New-PSMDModuleNugetPackage -ModulePath "$($publishDir.FullName)\PS.MTA-STS" -PackagePath .
 }
 else
 {
-	# Publish to Gallery
-	Write-Host  "Publishing the PS.MTA-STS module to $($Repository)"
-	Publish-Module -Path "$($publishDir.FullName)\PS.MTA-STS" -NuGetApiKey $ApiKey -Force -Repository $Repository
+    # Publish to Gallery
+    Write-Host  "Publishing the PS.MTA-STS module to $($Repository)"
+    Publish-Module -Path "$($publishDir.FullName)\PS.MTA-STS" -NuGetApiKey $ApiKey -Force -Repository $Repository
 }
 #endregion Publish

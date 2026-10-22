@@ -33,6 +33,12 @@
         .PARAMETER DnsServer
         Provide a String containing the IP address of the DNS server, which should be used to query the MX record. Default is 8.8.8.8 (Google DNS).
 
+        .PARAMETER UseClassicDNS
+        Switch to use the classic DNS resolution method with Resolve-DnsName. If not specified, the function will use the Google DNS over HTTPS method.
+
+        .PARAMETER SendTelemetry
+        Switch to enable sending telemetry events.
+
         .PARAMETER WhatIf
         Switch to run the command in a WhatIf mode.
 
@@ -40,12 +46,12 @@
         Switch to run the command in a Confirm mode.
 
         .EXAMPLE
-        Add-PSMTASTSCustomDomain -CsvPath "C:\temp\accepted-domains.csv" -ResourceGroupName "MTA-STS" -FunctionAppName "func-MTA-STS"
+        Add-PSMTASTSCustomDomain -CsvPath "C:\temp\accepted-domains.csv" -ResourceGroupName "MTA-STS" -FunctionAppName "func-MTA-STS" [-SendTelemetry]
 
         Reads list of accepted domains from "C:\temp\accepted-domains.csv" and adds them to Function App "func-MTA-STS" in Resource Group "MTA-STS". It also creates new certificate for each domain and adds binding to Function App.
 
         .EXAMPLE
-        Add-PSMTASTSCustomDomain -DomainName "contoso.com", "fabrikam.com" -ResourceGroupName "MTA-STS" -FunctionAppName "func-MTA-STS"
+        Add-PSMTASTSCustomDomain -DomainName "contoso.com", "fabrikam.com" -ResourceGroupName "MTA-STS" -FunctionAppName "func-MTA-STS" [-SendTelemetry]
 
         Adds domains "contoso.com" and "fabrikam.com" to Function App "func-MTA-STS" in Resource Group "MTA-STS". It also creates new certificate for each domain and adds binding to Function App.
 
@@ -69,9 +75,12 @@
         [Parameter(Mandatory = $true)]
         [string]
         $FunctionAppName,
+
+        [Parameter(Mandatory = $false)]
         [switch]
         $DoNotAddManagedCertificate,
 
+        [Parameter(Mandatory = $false)]
         [switch]
         $SkipCAACheck,
 
@@ -83,8 +92,17 @@
         [string]
         $CsvDelimiter = ";",
 
+        [Parameter(Mandatory = $false)]
         [String]
-        $DnsServer = "8.8.8.8"
+        $DnsServer = "8.8.8.8",
+
+        [Parameter(Mandatory = $false)]
+        [switch]
+        $UseClassicDNS = $false,
+
+        [Parameter(Mandatory = $false)]
+        [switch]
+        $SendTelemetry = $false
     )
     
     begin {
@@ -143,7 +161,16 @@
 
             #Check if mta-sts.domain.tld CNAME $FunctionAppName.azurewebsites.net exists
             $mtaStsDomain = "mta-sts." + $domain
-            $mtaStsCName = Resolve-PSMTASTSDnsName -Name $mtaStsDomain -Server $DnsServer -Type CNAME | Where-Object { $_.NameHost -like "*.azurewebsites.net" } | Select-Object -ExpandProperty NameHost
+            If ($UseClassicDNS -eq $true) {
+                $mtaStsCName = Resolve-PSMTASTSDnsName -Name $mtaStsDomain -Server $DnsServer -Type CNAME | Where-Object { $_.NameHost -like "*.azurewebsites.net" } | Select-Object -ExpandProperty NameHost
+            } else {
+                $mtaStsCName = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDomain&type=CNAME").Answer.data | Where-Object {$_ -like "*.azurewebsites.net."}
+                # Remove trailing dot from the CNAME record
+                If ($Null -ne $mtaStsCName)
+                {
+                    $mtaStsCName = $mtaStsCName.Substring(0, $mtaStsCName.Length - 1)
+                }
+            }
 
             # Check, if CNAME record exists
             if ($Null -eq $mtaStsCName -or $mtaStsCName -ne "$FunctionAppName.azurewebsites.net") {
@@ -151,7 +178,7 @@
                 continue
             }
 
-            #Check if CAA record exists and contains digicert.com
+            #Check if CAA record exists and contains digicert.com > CAA can't be resolved through Resolve-PSMTASTSDnsName
             If ($SkipCAACheck -ne $true) {
                 $json = Invoke-RestMethod -Uri "https://dns.google/resolve?name=$Domain&type=CAA"
                 If ($Null -ne $json.Answer.Data) {
@@ -189,6 +216,14 @@
         }
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Add custom domains")) {
             $null = Set-AzWebApp @setAzWebApp -WarningAction SilentlyContinue
+        }
+
+        # Send telemetry event for actually added custom domains
+        if ($SendTelemetry -and -not $WhatIfPreference) {
+            foreach ($AddedCustomDomain in $newCustomDomainsToAdd) {
+                $domainName = $AddedCustomDomain -replace '^mta-sts\.', ''
+                $null = Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain $domainName
+            }
         }
 
         # Stop here, if we should not add managed certificate

@@ -37,7 +37,12 @@
 
     Write-Verbose -Message "...checking $($Type.ToUpper()) record for $Name using DNS server $Server"
     try {
-        Resolve-DnsName -Name $Name -Type $Type -Server $Server -QuickTimeout -ErrorAction Stop
+        If ($UseClassicDNS) {
+            Resolve-DnsName -Name $Name -Type $Type -Server $Server -QuickTimeout -ErrorAction Stop
+        }
+        else {
+            Invoke-RestMethod -URI "https://dns.google/resolve?name=$Name&type=$Type"
+        }
     }
     catch {
         if($_.CategoryInfo.Category -eq "ResourceUnavailable") {

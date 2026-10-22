@@ -4,7 +4,7 @@ How does MTA-STS work? What are the benefits of MTA-STS? How can you deploy MTA-
 
 ## Usual mailflow without MTA-STS
 
-<img alt="Usual Mailflow diagram" src="./_images/3_0_usual-mailflow.png" width="800" />
+![Usual Mailflow diagram](./_images/3_0_usual-mailflow.png)
 
 1. Sending server from 'Contoso' looks up the MX record for the recipient domain 'fabrikam.com' in DNS server.
 2. DNS server returns the MX record for 'fabrikam.com' pointing to 'mx.fabrikam.com'.
@@ -14,7 +14,7 @@ How does MTA-STS work? What are the benefits of MTA-STS? How can you deploy MTA-
 
 ### Possible attack scenario without MTA-STS
 
-<img alt="Possible attack scenario without MTA-STS diagram" src="./_images/3_1_possible-attack-scenario.png" width="800" />
+![Possible attack scenario without MTA-STS diagram](./_images/3_1_possible-attack-scenario.png)
 
 1. Sending server from 'Contoso' looks up the MX record for the recipient domain 'fabrikam.com' in DNS server.
 2. DNS server returns the MX record, which has been manipulated by an attacker, pointing to 'mx.attacker.com'.
@@ -25,11 +25,11 @@ How does MTA-STS work? What are the benefits of MTA-STS? How can you deploy MTA-
 
 ## Usual mailflow with MTA-STS
 
-<img alt="Usual Mailflow with MTA-STS diagram" src="./_images/3_2_usual-mailflow-mta-sts.png" width="800" />
+![Usual Mailflow with MTA-STS diagram](./_images/3_2_usual-mailflow-mta-sts.png)
 
 1. Sending server from 'Contoso' looks up the TXT record for the recipient domain 'fabrikam.com', which is predefined as '_mta-sts.fabrikam.com' in DNS server.
 2. DNS server returns the TXT record for '_mta-sts.fabrikam.com' pointing to 'v=STSv1; id=20230712120000Z;', indicating that 'fabrikam.com' supports MTA-STS.
-3. Sending server queries the MTA-STS Policy for 'fabrikam.com' at 'https://mta-sts.fabrikam.com/.well-known/mta-sts.txt'.
+3. Sending server queries the MTA-STS Policy for 'fabrikam.com' at '<https://mta-sts.fabrikam.com/.well-known/mta-sts.txt>'.
 4. 'fabrikam.com' responds with the MTA-STS Policy, which indicates that MTA-STS is enforced and the email traffic should be sent to 'mx.fabrikam.com'.
 5. Sending server from 'Contoso' looks up the MX record for the recipient domain 'fabrikam.com' in DNS server.
 6. DNS server returns the MX record for 'fabrikam.com' pointing to 'mx.fabrikam.com'.
@@ -38,11 +38,11 @@ How does MTA-STS work? What are the benefits of MTA-STS? How can you deploy MTA-
 
 ## Possible attack scenario with MTA-STS, which can be detected and mitigated
 
-<img alt="Possible attack scenario with MTA-STS diagram" src="./_images/3_3_possible-attack-scenario-mta-sts.png" width="800" />
+![Possible attack scenario with MTA-STS diagram](./_images/3_3_possible-attack-scenario-mta-sts.png)
 
 1. Sending server from 'Contoso' looks up the TXT record for the recipient domain 'fabrikam.com', which is predefined as '_mta-sts.fabrikam.com' in DNS server.
 2. DNS server returns the TXT record for '_mta-sts.fabrikam.com' pointing to 'v=STSv1; id=20230712120000Z;', indicating that 'fabrikam.com' supports MTA-STS.
-3. Sending server queries the MTA-STS Policy for 'fabrikam.com' at 'https://mta-sts.fabrikam.com/.well-known/mta-sts.txt'.
+3. Sending server queries the MTA-STS Policy for 'fabrikam.com' at '<https://mta-sts.fabrikam.com/.well-known/mta-sts.txt>'.
 4. 'fabrikam.com' responds with the MTA-STS Policy, which indicates that MTA-STS is enforced and the email traffic should be sent to 'mx.fabrikam.com'.
 5. Sending server looks up the MX record for the recipient domain 'fabrikam.com' in DNS server.
 6. DNS server returns the MX record, which has been manipulated by an attacker, pointing to 'mx.attacker.com'.

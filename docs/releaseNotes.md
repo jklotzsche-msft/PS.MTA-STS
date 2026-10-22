@@ -8,6 +8,28 @@ To update the module to the latest version, use the following command:
 Update-Module -Name PS.MTA-STS
 ```
 
+## Version 1.4.0
+
+The 1.4.0 release of the PS.MTA-STS module includes (but is not limited to) the following changes and improvements:
+
+- Upgrade to PowerShell 7.6 for Azure Function --> Thanks to [PC-SPEZIALIST](https://github.com/PC-SPEZIALIST)
+- New-PSMTASTSFunctionAppDeployment set Storage Account to TLS1.2 - ([GitHub Issue #45](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/45)) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- Update-PSMTASTSFunctionAppFile updates Storage Account to TLS1.2 - ([GitHub Issue #45](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/45)) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- Remove-PSMTASTSFunctionAppDeployment removes FunctionApp, Storage Account and App Service Plan - ([GitHub Issue #41](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/41)) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- New-PSMTASTSFunctionAppDeployment Disabled ApplicationInsights by default but can be enabled with -EnableApplicationInsights
+- Added an optional Telemetry Function with a parameter `SendTelemetry` to `Add/Remove-PSMTASTSCustomDomain` - ([GitHub Issue #31](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/31) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- Updated tp Pester 6.2.0 --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- Resolve-PSMTASTSDnsName.ps1 upated to DNS over HTTPS - ([GitHub Issue #40](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/40))
+- Updated Documentation / Readme / Contributing --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- Small changes implemented so it runs also in Linux --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+
+## Version 1.3.1
+
+- Updated the GitHub Actions build environment from Windows Server 2019 to Windows Server 2025.
+- Refined the CI/CD workflow configuration for continued compatibility with GitHub-hosted runners.
+- Updated Azure Functions Extension Bundle support from v3 to v4 via [PR #47](https://github.com/jklotzsche-msft/PS.MTA-STS/pull/47), improving compatibility with newer Azure Functions runtimes  --> Thanks to [PC-SPEZIALIST](https://github.com/PC-SPEZIALIST)
+- Increased module version from 1.3.0 to 1.3.1.
+
 ## Version 1.3.0
 
 The 1.3.0 release of the PS.MTA-STS module includes (but is not limited to) the following changes and improvements:

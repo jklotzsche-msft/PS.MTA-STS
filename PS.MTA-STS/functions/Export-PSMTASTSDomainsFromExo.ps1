@@ -31,6 +31,9 @@
         .PARAMETER DnsServer
         Provide a String containing the IP address of the DNS server, which should be used to query the MX record. Default is 8.8.8.8 (Google DNS).
 
+        .PARAMETER UseClassicDNS
+        Provide a switch to use the classic DNS resolver instead of DNS over HTTPS. Default is $false.
+
         .PARAMETER SkipDNSTests
         With this Parameter the DNS Checks will be skipped
 
@@ -56,7 +59,7 @@
     [CmdletBinding()]
     param(
         [string]
-        $CsvPath = (Join-Path -Path $env:TEMP -ChildPath "$(Get-Date -Format yyyyMMddhhmmss)_mta-sts-export.csv"),
+        $CsvPath = (Join-Path -Path  ([System.IO.Path]::GetTempPath()) -ChildPath "$(Get-Date -Format yyyyMMddhhmmss)_mta-sts-export.csv"),
 
         [Parameter(ValueFromPipeline = $true)]
         [PSObject[]]
@@ -92,7 +95,11 @@
 
         #Skip DNS Tests
         [switch]
-        $SkipDNSTests
+        $SkipDNSTests,
+
+        [Parameter(Mandatory = $false)]
+        [switch]
+        $UseClassicDNS = $false
     )
     
     begin {
@@ -165,10 +172,16 @@
             # Checking MTA-STS TXT Record
             # Example: _mta-sts.example.com. IN TXT "v=STSv1; id=20160831085700Z"
             $mtaStsDNSHost = "_mta-sts." + $acceptedDomain.DomainName
-            $mtaStsTXTRecord = Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer | Where-Object { $_.Strings -match "v=STSv1" }
+            If ($UseClassicDNS) {
+                $mtaStsTXTRecord = (Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer | Where-Object { $_.Strings -match "v=STSv1" }).Strings
+            }
+            Else {
+                $DNSAnswer = Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDNSHost&type=TXT"
+                $mtaStsTXTRecord = $DNSAnswer.Answer.data | Where-Object {$_ -match "v=STSv1"}
+            }
 
             if ($null -ne $mtaStsTXTRecord) {
-                $resultObject.MTA_STS_TXTRecord = $mtaStsTXTRecord.strings -join " | " # Strings are joined, because multiple strings can be returned
+                $resultObject.MTA_STS_TXTRecord = $mtaStsTXTRecord -join " | " # Strings are joined, because multiple strings can be returned
             }
 
             # Checking MTA-STS Policy
@@ -182,7 +195,7 @@
             Write-Verbose "...checking MTA-STS Policy file at $mtaStsUri"
             try {
                 # Try to get the MTA-STS Policy file
-                $mtaStsPolicyResponse = Invoke-WebRequest -Uri $mtaStsUri -TimeoutSec 20 -ErrorAction Stop
+                $mtaStsPolicyResponse = Invoke-WebRequest -UseBasicParsing -Uri $mtaStsUri -TimeoutSec 20 -ErrorAction Stop
                 $resultObject.MTA_STS_Policy = ($mtaStsPolicyResponse.Content).Trim() #.Replace("`r`n","")
             }
             catch {
@@ -193,15 +206,32 @@
             # Checking TLSRPT Record
             # Example: _smtp._tls.example.com. IN TXT "v=TLSRPTv1;rua=mailto:reports@example.com"
             $tlsRptDNSHost = "_smtp._tls." + $acceptedDomain.DomainName
-            $tlsRptRecord = Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -like "v=TLSRPTv1*" }
+            If ($UseClassicDNS) {
+                $tlsRptRecord = (Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -like "v=TLSRPTv1*" }).Strings
+            }
+            Else {
+                $DNSAnswer = Invoke-RestMethod -URI "https://dns.google/resolve?name=$tlsRptDNSHost&type=TXT"
+                $tlsRptRecord = $DNSAnswer.Answer.data | Where-Object {$_ -match "v=TLSRPTv1"}
+            }
 
             if ($null -ne $tlsRptRecord) {
-                $resultObject.TLSRPT = $tlsRptRecord.Strings[0]
+                $resultObject.TLSRPT = $tlsRptRecord
             }
 
             # Checking MX Record
             # Example: example.com. IN MX 0 example-com.mail.protection.outlook.com.
-            $mxRecord = Resolve-PSMTASTSDnsName -Name $acceptedDomain.DomainName -Type MX -Server $DnsServer -ErrorAction SilentlyContinue
+            If ($UseClassicDNS) {
+                $mxRecord = (Resolve-PSMTASTSDnsName -Name $acceptedDomain.DomainName -Type MX -Server $DnsServer -ErrorAction SilentlyContinue).NameExchange
+            }
+            Else {
+                $DNSAnswer = Invoke-RestMethod -URI "https://dns.google/resolve?name=$($acceptedDomain.DomainName)&type=MX"
+                $mxRecord = $DNSAnswer.Answer.data | ForEach-Object {
+                    $parts = ($_ -split ' ')
+                    if ($parts.Count -gt 1) {
+                        $parts[1].TrimEnd('.')
+                    }
+                }
+            }
 
             # $resultObject.MTA_STS_CanBeUsed = "No" # Default value
             # Check if the domain is an onmicrosoft.com domain
@@ -210,7 +240,7 @@
             }
             else {
                 # new else block to skip MX Record check
-                $resultObject.MX_Record_Pointing_To = $mxRecord.NameExchange
+                $resultObject.MX_Record_Pointing_To = $mxRecord -join ", "
             }
             <# Removed the MX record check, because we cannot tell foreach domain, which MX record is correct. Previously, this was possible, as we only checked for the single Exchange Online MX record *.mail.protection.outlook.com.
             # Check if the MX record points to Exchange Online
@@ -250,20 +280,45 @@
     }
     
     end {
-        # Output the result in a new PowerShell window
         $domainsToExport = $result
+    
         if ($DisplayResult) {
-            Write-Warning "Please select/highlight the domains you want to configure MTA-STS for in the new PowerShell window and click OK. You can select multiple entries by holding the CTRL key OR by selecting your first entry, then holding the SHIFT key and selecting your last entry."
-            $domainsToExport = $result | Sort-Object -Property MTA_STS_CanBeUsed, Name | Out-GridView -Title "Please select the domains you want to configure MTA-STS for and click OK." -PassThru
+            if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows) -eq $true) {
+                # Windows
+                Write-Warning "Please select/highlight the domains..."
+                $domainsToExport = $result |
+                    Sort-Object -Property Name |
+                    Out-GridView -Title "Please select the domains you want to configure MTA-STS for and click OK." -PassThru
+            }
+            else {
+                # MacOS/Linux
+                Write-Host "Linux detected: interactive GridView selection is not supported."
+                Write-Host "Select domains by number (comma-separated), or press Enter to export all."
+                $items = @($result | Sort-Object -Property Name)
+    
+                if ($items.Count -gt 0) {
+                    for ($i = 0; $i -lt $items.Count; $i++) {
+                        $item = $items[$i]
+                        Write-Host ("[{0}] {1}" -f ($i + 1), $item.Name)
+                    }
+    
+                    $selection = Read-Host "Enter domain numbers to export (blank = all)"
+                    if ([string]::IsNullOrWhiteSpace($selection)) {
+                        $domainsToExport = $items
+                    }
+                    else {
+                        $indexes = $selection -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^\d+$' } | ForEach-Object { [int]$_ - 1 }
+                        $domainsToExport = @($items[$indexes])
+                    }
+                }
+            }
         }
-
-        # Check if the user selected any domains
+    
         if ($null -eq $domainsToExport) {
             Write-Verbose "No domains selected. Exiting."
             return
         }
-
-        # Export the result to a .csv file
+    
         Write-Warning "Exporting $($domainsToExport.count) domain(s) to $CsvPath"
         $domainsToExport | Export-Csv -Path $CsvPath -Delimiter $CsvDelimiter -Encoding $CsvEncoding -NoTypeInformation -Force
     }

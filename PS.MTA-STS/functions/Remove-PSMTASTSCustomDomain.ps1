@@ -24,6 +24,9 @@
         .PARAMETER CsvDelimiter
         Provide delimiter of csv file. Default is ";".
 
+        .PARAMETER SendTelemetry
+        Switch to enable sending telemetry events.
+
         .PARAMETER WhatIf
         Switch to run the command in a WhatIf mode.
 
@@ -31,12 +34,12 @@
         Switch to run the command in a Confirm mode.
 
         .EXAMPLE
-        Remove-PSMTASTSCustomDomain -CsvPath "C:\temp\accepted-domains.csv" -ResourceGroupName "MTA-STS" -FunctionAppName "func-MTA-STS"
+        Remove-PSMTASTSCustomDomain -CsvPath "C:\temp\accepted-domains.csv" -ResourceGroupName "MTA-STS" -FunctionAppName "func-MTA-STS" [-SendTelemetry]
 
         Reads list of accepted domains from "C:\temp\accepted-domains.csv" and removes them from Function App "func-MTA-STS" in Resource Group "MTA-STS".
 
         .EXAMPLE
-        Remove-PSMTASTSCustomDomain -DomainName "contoso.com", "fabrikam.com" -ResourceGroupName "MTA-STS" -FunctionAppName "func-MTA-STS"
+        Remove-PSMTASTSCustomDomain -DomainName "contoso.com", "fabrikam.com" -ResourceGroupName "MTA-STS" -FunctionAppName "func-MTA-STS" [-SendTelemetry]
 
         Removes domains "contoso.com" and "fabrikam.com" from Function App "func-MTA-STS" in Resource Group "MTA-STS".
 
@@ -67,7 +70,10 @@
 
         [Parameter(ParameterSetName = "Csv")]
         [string]
-        $CsvDelimiter = ";"
+        $CsvDelimiter = ";",
+
+        [Parameter(Mandatory = $false)]
+        [switch]$SendTelemetry = $false
     )
     
     begin {
@@ -154,6 +160,14 @@
             $null = Set-AzWebApp @setAzWebApp -WarningAction SilentlyContinue
         }
 
+        # Send telemetry event for actually removed custom domains (skip in WhatIf mode)
+        if ($SendTelemetry -and -not $WhatIfPreference) {
+            foreach ($RemovedCustomDomain in $removeCustomDomains) {
+                $domainName = $RemovedCustomDomain -replace '^mta-sts\.', ''
+                $null =Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "RemoveDomain" -Domain $domainName
+            }
+        }
+
         #Remove Managed Certificate if needed
         Write-Verbose "Remove Certificates"
         [Array]$webAppCertificates = Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName
@@ -162,7 +176,7 @@
             if ($subjectName -in $removeCustomDomains) {
                 #Get Thumbprint of Certificate
                 $thumbprint = $certificate.Thumbprint
-				
+
                 #Remove Managed Certificate
                 Write-Verbose "Remove Managed Certificate: $subjectName Thumbprint: $thumbprint"
                 if ($PSCmdlet.ShouldProcess("Subject: $subjectName, Thumbprint: $thumbprint", "Remove managed certificate")) {
