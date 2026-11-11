@@ -17,7 +17,7 @@ Edit the TTL of your DNS Records to a lower value. This will help you to switch 
 Add the custom domains to the new Azure Function App. Follow the guidance at [Deploy MTA-STS using a Azure Function App](./deployFunctionApp.md) to add the custom domains (Step 3)
 > Note: When you update the DNS records, but the custom domain is not yet added to the new Azure Function App, the MTA-STS policy will not be served. In this case, the following behavior will occur according to the [RFC8461](https://datatracker.ietf.org/doc/html/rfc8461):
 
-``` Text
+```txt
    If a valid TXT record is found but no policy can be fetched via HTTPS
    (for any reason), and there is no valid (non-expired) previously
    cached policy, senders MUST continue with delivery as though the
@@ -34,7 +34,7 @@ Now, the custom domain(s) are configured in multiple Azure resources, but only t
 
 You can do so manually in the Azure Portal or by using the prepared function `Remove-PSMTASTSCustomDomain` from the PS.MTA-STS module.
 
-``` Powershell
+```Powershell
 Remove-PSMTASTSCustomDomain -ResourceGroupName 'rg-myMTASTSDeployment' -FunctionAppName 'func-myMTASTSDeployment' -DomainName 'contoso.com'
 ```
 

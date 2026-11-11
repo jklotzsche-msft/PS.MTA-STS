@@ -2,7 +2,7 @@
 
 PowerShell-Mail Transfer Agent-Strict Transport Security | Enhancing mail flow by deploying and testing MTA-STS for Exchange Online using this PowerShell module.
 
-<img alt="Logo - E-Mail flying around planet earth. This is the logo for this project." src="./docs/_images/PS.MTA-STS-Logo.jpg" width="200" />
+![Logo - E-Mail flying around planet earth. This is the logo for this project.](./docs/_images/PS.MTA-STS-Logo.jpg)
 
 This module is for you, if you ...
 
@@ -102,17 +102,35 @@ If you want to deploy a Azure Function App to host your MTA-STS policy using thi
 No matter which of the options above you choose, you will end up with a Azure resource that hosts your MTA-STS policy. In both cases, you will be able to use at least
 
 - 'Export-PSMTASTSDomainsFromExo' function to get a csv file containing your accepted domains with MX record validation
+- 'New-PSMTASTSFunctionAppDeployment' function to deploy the function app and deploy the app files with your MTA-STS policy
+- 'Add-PSMTASTSCustomDomain' function to add a custom domain to the function app
+- 'Get-PSMTASTSCustomDomain' function to list your custom domains from the function app
+- 'Remove-PSMTASTSCustomDomain' function to remove a custom domain from the function app
 - 'Update-PSMTASTSFunctionAppFile' function to update the function app files with your MTA-STS policy
 - 'Test-MTASTSConfiguration' function to test your MTA-STS configuration for all provided domains
+- 'Remove-PSMTASTSFunctionAppDeployment' function to remove the function app
 
 For more information about the functions, import the module and use 'Get-Help' to get the help for the functions.
 
 ``` Powershell
+# Import Module
 Import-Module -Name PS.MTA-STS
+
+# List Functions
+Get-Command -Module PS.MTA-STS
+
+# Get Help
+Get-Help -Name Add-PSMTASTSCustomDomain -Full
 Get-Help -Name Export-PSMTASTSDomainsFromExo -Full
+Get-Help -Name Get-PSMTASTSCustomDomain -Full
+Get-Help -Name New-PSMTASTSFunctionAppDeployment -Full
+Get-Help -Name Remove-PSMTASTSCustomDomain -Full
+Get-Help -Name Remove-PSMTASTSFunctionAppDeployment -Full
+Get-Help -Name Test-PSMTASTSConfiguration -Full
 Get-Help -Name Update-PSMTASTSFunctionAppFile -Full
-Get-Help -Name Test-MTASTSConfiguration -Full
 ```
+
+> Note: You can run all the commands with the -verbose Parameter so you see what's going on
 
 ## Update existing MTA-STS Deployment
 
@@ -120,7 +138,8 @@ If you already have a MTA-STS deployment and want to update the MTA-STS policy, 
 This is useful if you want to change the policy mode from 'Testing' to 'Enforce' or if you want to update your app files with the latest version of this module.
 
 ``` Powershell
-Update-PSMTASTSFunctionAppFile -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS' -PolicyMode 'Enforce'
+# PolicyModes: "Enforce", "Testing", "None"
+Update-PSMTASTSFunctionAppFile -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS' -PolicyMode 'Enforce' -Verbose
 
 # Updates the Azure Function App with the name 'PSMTASTS' in the resource group 'PSMTASTS' with policy mode 'Enforce'.
 # This will overwrite any changes you made to the Azure Function App!
@@ -137,6 +156,10 @@ For more information about the latest changes, please check out the [release not
 ## Frequently Asked Questions (FAQ)
 
 For more information about frequently asked questions, please check out the [FAQ](./docs/faq.md).
+
+## Contribution
+
+If you want to contribute to this project - please read [CONTRIBUTING](CONTRIBUTING.md)
 
 ## Resources / Links
 

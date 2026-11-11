@@ -4,7 +4,7 @@
     RootModule        = 'PS.MTA-STS.psm1'
 
     # Version number of this module.
-    ModuleVersion     = '1.3.1'
+    ModuleVersion     = '1.4.0'
 
     # Supported PSEditions
     # CompatiblePSEditions = @()
@@ -49,6 +49,7 @@
         'Az.Resources',
         'Az.Storage',
         'Az.Websites',
+        'Az.ApplicationInsights',
         'ExchangeOnlineManagement'
     )
 
@@ -70,15 +71,13 @@
     # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
     FunctionsToExport = @(
         'Export-PSMTASTSDomainsFromExo',
-
         'New-PSMTASTSFunctionAppDeployment',
         'Update-PSMTASTSFunctionAppFile',
-
         'Add-PSMTASTSCustomDomain',
         'Get-PSMTASTSCustomDomain',
         'Remove-PSMTASTSCustomDomain',
-    
-        'Test-PSMTASTSConfiguration'
+        'Test-PSMTASTSConfiguration',
+		'Remove-PSMTASTSFunctionAppDeployment'
     )
 
     # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -105,7 +104,7 @@
         PSData = @{
 
             # Tags applied to this module. These help with module discovery in online galleries.
-            # Tags = @()
+            Tags = @('ExchangeOnline', 'MTA-STS', 'SMTP', 'EmailSecurity', 'Exchange', 'AzureFunctions', 'Security')
 
             # A URL to the license for this module.
             LicenseUri = 'https://github.com/jklotzsche-msft/PS.MTA-STS/blob/main/LICENSE'

@@ -7,7 +7,7 @@
         Publishes Azure Function App files and functions to Azure Function App.
         The Azure Function App will be updated with the latest PowerShell code.
         This will overwrite any changes you may have made to the Azure Function App!
-        
+
     .PARAMETER ResourceGroupName
         Provide the name of the Azure resource group, where the Azure Function App should be updated.
     
@@ -30,16 +30,16 @@
 
     .PARAMETER Confirm
         If this switch is provided, you will be asked for confirmation before any changes are made.
-        
+
     .EXAMPLE
         Update-PSMTASTSFunctionAppFile -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS' -PolicyMode 'Testing'
-        
+
         Updates the Azure Function App with the name 'PSMTASTS' in the resource group 'PSMTASTS' with policy mode 'Testing'.
         This will overwrite any changes you made to the Azure Function App!
 
     .EXAMPLE
         Update-PSMTASTSFunctionAppFile -ResourceGroupName 'rg-PSMTASTS' -FunctionAppName 'func-PSMTASTS' -PolicyMode 'Enforce' -ExoHostName '*.abcd-v1.mx.microsoft', 'mail.fabrikam.com'
-        
+
         Updates the Azure Function App with the name 'PSMTASTS' in the resource group 'PSMTASTS' with policy mode 'Enforce'.
         Additionally, it adds the MX record '*.abcd-v1.mx.microsoft' and 'mail.fabrikam.com' to the MTA-STS policy.
         The MTA-STS policy file will look like this:
@@ -59,18 +59,10 @@
     #region Parameter
     [CmdletBinding(SupportsShouldProcess = $true)]
     Param (
-        [Parameter(Mandatory = $true)]
-        [String]
-        $ResourceGroupName,
-
-        [Parameter(Mandatory = $true)]
-        [String]
-        $FunctionAppName,
-
+        [Parameter(Mandatory = $true)][String]$ResourceGroupName,
+        [Parameter(Mandatory = $true)][String]$FunctionAppName,
         [ValidateSet("Enforce", "Testing", "None")] # ValidateSet is used to limit the possible values
-        [String]
-        $PolicyMode = "Enforce",
-
+        [String]$PolicyMode = "Enforce",
         [ValidateScript({
                 # the provided list of hostnames must be valid, which means that they must be valid domain names
                 # Domain Names cannot start with a dot, so we need to check for that
@@ -94,7 +86,7 @@
 
     begin {
         # Set working directory for temporary files
-        $workingDirectory = Join-Path -Path $env:TEMP -ChildPath "PS.MTA-STS_deployment"
+        $workingDirectory = Join-Path -Path  ([System.IO.Path]::GetTempPath()) -ChildPath "PS.MTA-STS_deployment"
 
         # Trap errors
         trap {
@@ -115,7 +107,7 @@
             $null = Connect-AzAccount
         }
     }
-    
+
     process {
         # Create, if resource group doesn't exist already. If it doesn't exist, create it.
         Write-Verbose "Checking if ResourceGroup '$ResourceGroupName' already exists"
@@ -179,11 +171,65 @@
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update")) {
             $null = Publish-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -ArchivePath "$workingDirectory/Function.zip" -Confirm:$false -Force
         }
-        
+
+        # Set FTP disabled
+        Write-Verbose "Disabling FTP for Azure Function App $($FunctionAppName)..."
+        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update runtime/security settings")) {
+            $null = Set-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -FtpsState Disabled -WarningAction SilentlyContinue
+        }
+
+        # Set TLS Version 1.3 and PowerShell Version 7.6
+        Write-Verbose "Setting TLS Version to 1.2 / PowerShell Version to 7.6"
+        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update TLS 1.2 and PowerShell 7.6")) {
+            $subscriptionId = (Get-AzContext).Subscription.Id
+            $body = @{
+                properties = @{
+                    minTlsVersion     = "1.2"
+                    scmMinTlsVersion  = "1.2"
+                    powerShellVersion = "7.6"
+                }
+            } | ConvertTo-Json -Depth 3
+
+            $path = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Web/sites/$FunctionAppName/config/web?api-version=2026-07-15"
+            $null = Invoke-AzRestMethod -Method PATCH -Path $path -Payload $body
+        }
+
         # Clean up
         Write-Verbose "Cleanup Temp Folder"
         if (Test-Path -Path $workingDirectory) {
             $null = Get-ChildItem -Path $workingDirectory -Recurse | Remove-Item -Recurse -Force -Confirm:$false
+        }
+
+        #Upate Strage Account to TLS 1.2
+        Write-Verbose "Update Storage Account to TLS 1.2"
+        $FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+        
+        $StorageAccountName = $null
+        $contentConn = $FunctionAppSetting["WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"]
+        
+        if (-not [string]::IsNullOrWhiteSpace($contentConn) -and $contentConn -match "(^|;)AccountName=([^;]+)") {
+            $StorageAccountName = $matches[2]
+        }
+        
+        if (-not $StorageAccountName) {
+            $jobsConn = $FunctionAppSetting["AzureWebJobsStorage"]
+            if (-not [string]::IsNullOrWhiteSpace($jobsConn) -and $jobsConn -match "(^|;)AccountName=([^;]+)") {
+                $StorageAccountName = $matches[2]
+            }
+        }
+        
+        if (-not $StorageAccountName) {
+            $StorageAccountName = $FunctionAppSetting["AzureWebJobsStorage__accountName"]
+        }
+        
+        if ($StorageAccountName) {
+            $StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -ErrorAction SilentlyContinue
+            if ($null -ne $StorageAccount) {
+                $null = Set-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -MinimumTlsVersion "TLS1_2" -ErrorAction SilentlyContinue
+            }
+        }
+        else {
+            Write-Warning "Could not determine the storage account name from Function App settings. TLS update skipped."
         }
     }
 }

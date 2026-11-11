@@ -24,7 +24,7 @@ Before you begin, make sure you have the following:
 1. In the Function App's overview page, click on "Alerts" in the left-hand menu.
 2. Click on "Create alert rule" to create a new alert rule.
 
-    <img alt="Screenshot of creation of an alert rule" src="./_images/2_0_alertRule_0.png" width="500" />
+![Screenshot of creation of an alert rule](./_images/2_0_alertRule_0.png)
 
 ## Step 4: Define the Alert Condition
 
@@ -53,7 +53,7 @@ Before you begin, make sure you have the following:
 
 4. Configure any additional conditions or actions as needed.
 
-    <img alt="Screenshot of creation of an alert condition" src="./_images/2_0_alertRule_1.png" width="500" />
+![Screenshot of creation of an alert condition](./_images/2_0_alertRule_1.png)
 
 ## Step 5: Configure the Alert Action
 
@@ -61,11 +61,11 @@ Before you begin, make sure you have the following:
 2. If you are creating a new action group, provide a name for the action group and select the appropriate notification type (e.g. send an email).
 3. Configure the necessary details for the selected action type.
 
-    <img alt="Screenshot of creation of an action group" src="./_images/2_0_alertRule_2.png" width="500" />
+![Screenshot of creation of an action group](./_images/2_0_alertRule_2.png)
 
 4. Click on "OK" to save the action group.
 
-    <img alt="Screenshot of creation of an action group" src="./_images/2_0_alertRule_3.png" width="500" />
+![Screenshot of creation of an action group](./_images/2_0_alertRule_3.png)
 
 ## Step 6: Configure Details for the Alert Rule
 
@@ -73,14 +73,14 @@ Before you begin, make sure you have the following:
 2. Optionally, provide a description for the alert rule.
 3. Configure the severity and frequency of the alert rule.
 
-    <img alt="Screenshot of configuration of details of our alert rule" src="./_images/2_0_alertRule_4.png" width="500" />
+![Screenshot of configuration of details of our alert rule](./_images/2_0_alertRule_4.png)
 
 ## Step 7: Review and Create the Alert Rule
 
 1. Review the alert rule settings to ensure they are correct.
 2. Click on "Create alert rule" to create the alert rule.
 
-    <img alt="Screenshot of configuration of details of our alert rule" src="./_images/2_0_alertRule_5.png" width="500" />
+    ![Screenshot of configuration of details of our alert rule](./_images/2_0_alertRule_5.png)
 
 ## Step 8: Create more alert rules
 
@@ -88,7 +88,7 @@ Before you begin, make sure you have the following:
 
     > **NOTE** It is recommended to create alert rules for different conditions such as HTTP 5xx errors, HTTP 4xx errors, response time, etc. to ensure comprehensive monitoring of your function app.
 
-    <img alt="Screenshot of configuration of details of our alert rule" src="./_images/2_0_alertRule_6.png" width="500" />
+    ![Screenshot of configuration of details of our alert rule](./_images/2_0_alertRule_6.png)
 
 ## Step 9: Test the Alert Rule
 
