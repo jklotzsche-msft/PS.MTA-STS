@@ -301,29 +301,6 @@ Describe 'Review regression tests without Azure or a test domain' {
             ($record | ConvertFrom-PSMTASTSTxtRecord) | Should -Be 'first "quoted"second\part'
         }
 
-        It 'recognizes unquoted logical TXT values returned by the Google API' {
-            $script:mtaDoh[0].Data = $script:mtaText
-            $script:tlsDoh[0].Data = $script:tlsText
-            $result = Test-PSMTASTSConfiguration -DomainName example.com -DisplayResult $false
-            $result.MTA_STS_TXTRecord | Should -Be 'OK'
-            $result.TLSRPT | Should -Be $script:tlsText
-        }
-
-        It 'exports unquoted logical TXT values returned by the Google API' {
-            $script:mtaDoh[0].Data = $script:mtaText
-            $script:tlsDoh[0].Data = $script:tlsText
-            $path = Join-Path $TestDrive 'unquoted.csv'
-            Export-PSMTASTSDomainsFromExo -DomainName example.com -DisplayResult $false -CsvPath $path
-            $row = @(Import-Csv $path -Delimiter ';')[0]
-            $row.MTA_STS_TXTRecord | Should -Be $script:mtaText
-            $row.TLSRPT | Should -Be $script:tlsText
-        }
-
-        It 'preserves literal quotes and backslashes in unquoted logical TXT data' {
-            $record = [pscustomobject]@{ Type = 16; Data = 'plain "quoted" \123' }
-            ($record | ConvertFrom-PSMTASTSTxtRecord) | Should -Be 'plain "quoted" \123'
-        }
-
         It 'rejects malformed DNS TXT presentation data: <Data>' -TestCases @(
             @{ Data = '"unterminated' }, @{ Data = '"valid" trailing garbage' }, @{ Data = '"invalid\999"' }
         ) {

@@ -13,10 +13,9 @@ Update-Module -Name PS.MTA-STS
 The 1.4.0 release of the PS.MTA-STS module includes (but is not limited to) the following changes and improvements:
 
 - Match deployment certificates by bound thumbprint, including multiple SSL bindings, without selecting unrelated certificates by name.
-- Normalize classic DNS and DNS-over-HTTPS TXT records consistently, including quoted or unquoted responses, TLS-RPT, CNAME answers and segmented TXT values. Count distinct matching records rather than answer entries or character strings.
+- Normalize classic DNS and DNS-over-HTTPS TXT records consistently, including TLS-RPT, CNAME answers and segmented TXT values. Count distinct matching records rather than answer entries or character strings.
 - Send opt-in domain telemetry only after an approved successful domain change; declined confirmation, WhatIf and failed updates do not send success events.
 - Add offline regression tests for certificate selection, TXT parsing, CSV exports and telemetry behavior.
-- Clean each update's unique temporary staging directory after success or failure, and add local deployment-package and generated-function tests.
 - Upgrade to PowerShell 7.6 for Azure Function --> Thanks to [PC-SPEZIALIST](https://github.com/PC-SPEZIALIST)
 - New-PSMTASTSFunctionAppDeployment set Storage Account to TLS1.2 - ([GitHub Issue #45](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/45)) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
 - Update-PSMTASTSFunctionAppFile updates Storage Account to TLS1.2 - ([GitHub Issue #45](https://github.com/jklotzsche-msft/PS.MTA-STS/issues/45)) --> Thanks to [BohrenAn](https://github.com/BohrenAn)
