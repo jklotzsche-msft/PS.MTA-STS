@@ -86,17 +86,7 @@
 
     begin {
         # Set working directory for temporary files
-        $workingDirectory = Join-Path -Path  ([System.IO.Path]::GetTempPath()) -ChildPath "PS.MTA-STS_deployment"
-
-        # Trap errors
-        trap {
-            # Clean up, if needed
-            if (Test-Path -Path $workingDirectory) {
-                $null = Remove-Item -Path $workingDirectory -Recurse -Force
-            }
-            
-            throw $_
-        }
+        $workingDirectory = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ("PS.MTA-STS_deployment_" + [guid]::NewGuid().ToString('N'))
 
         # Preset ActionPreference to Stop, if not set by user through common parameters
         if (-not $PSCmdlet.MyInvocation.BoundParameters.ContainsKey('ErrorAction')) { $local:ErrorActionPreference = "Stop" }
@@ -109,127 +99,125 @@
     }
 
     process {
-        # Create, if resource group doesn't exist already. If it doesn't exist, create it.
-        Write-Verbose "Checking if ResourceGroup '$ResourceGroupName' already exists"
-        if ($null -eq (Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue)) {
-            throw "ResourceGroup '$ResourceGroupName' does not exist. Please create it first."
-        }
+        try {
+            # Create, if resource group doesn't exist already. If it doesn't exist, create it.
+            Write-Verbose "Checking if ResourceGroup '$ResourceGroupName' already exists"
+            if ($null -eq (Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue)) {
+                throw "ResourceGroup '$ResourceGroupName' does not exist. Please create it first."
+            }
 
-        # Set default resource group for future cmdlets in this powershell session
-        $null = Set-AzDefault -ResourceGroupName $ResourceGroupName
+            # Set default resource group for future cmdlets in this powershell session
+            $null = Set-AzDefault -ResourceGroupName $ResourceGroupName
 
-        # Check, if FunctionApp exists already
-        Write-Verbose "Checking if Function Account exists in DNS"
-        $functionApp = Get-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
-        if ($null -eq $functionApp) {
-            throw "Function App '$FunctionAppName' does not exist. Please create it first using 'New-PSMTASTSFunctionAppDeployment'."
-        }
+            # Check, if FunctionApp exists already
+            Write-Verbose "Checking if Function Account exists in DNS"
+            $functionApp = Get-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+            if ($null -eq $functionApp) {
+                throw "Function App '$FunctionAppName' does not exist. Please create it first using 'New-PSMTASTSFunctionAppDeployment'."
+            }
 
-        # Create Function App contents in temporary folder and zip it
-        Write-Verbose "Creating Function App content in temp folder..."
-        if (Test-Path -Path $workingDirectory) {
-            $null = Get-ChildItem -Path $workingDirectory -Recurse | Remove-Item -Recurse -Force -Confirm:$false
-        }
-
-        # Create Function App contents
+            # Create Function App contents in temporary folder and zip it
+            Write-Verbose "Creating Function App content in temp folder..."
+            # Create Function App contents
         
-        ## App files
-        $null = New-Item -Path $workingDirectory -ItemType Directory -ErrorAction SilentlyContinue
-        $null = New-Item -Path "$workingDirectory/function" -ItemType Directory
-        $null = $script:PSMTASTS_hostJson | Set-Content -Path "$workingDirectory/function/host.json" -Force
-        $null = $script:PSMTASTS_profilePs1 | Set-Content -Path "$workingDirectory/function/profile.ps1" -Force
-        $null = $script:PSMTASTS_requirementsPsd1 | Set-Content -Path "$workingDirectory/function/requirements.psd1" -Force
+            ## App files
+            $null = New-Item -Path $workingDirectory -ItemType Directory -ErrorAction Stop
+            $null = New-Item -Path "$workingDirectory/function" -ItemType Directory
+            $null = $script:PSMTASTS_hostJson | Set-Content -Path "$workingDirectory/function/host.json" -Force
+            $null = $script:PSMTASTS_profilePs1 | Set-Content -Path "$workingDirectory/function/profile.ps1" -Force
+            $null = $script:PSMTASTS_requirementsPsd1 | Set-Content -Path "$workingDirectory/function/requirements.psd1" -Force
         
-        ## Root Website function
-        $null = New-Item -Path "$workingDirectory/function/WebsiteRoot" -ItemType Directory
-        $null = $script:Root_functionJson | Set-Content -Path "$workingDirectory/function/WebsiteRoot/function.json" -Force
-        $null = $script:Root_runPs1 | Set-Content -Path "$workingDirectory/function/WebsiteRoot/run.ps1" -Force
+            ## Root Website function
+            $null = New-Item -Path "$workingDirectory/function/WebsiteRoot" -ItemType Directory
+            $null = $script:Root_functionJson | Set-Content -Path "$workingDirectory/function/WebsiteRoot/function.json" -Force
+            $null = $script:Root_runPs1 | Set-Content -Path "$workingDirectory/function/WebsiteRoot/run.ps1" -Force
         
-        ## MTA-STS Policy function
-        $null = New-Item -Path "$workingDirectory/function/MTASTS" -ItemType Directory
-        $null = $script:PSMTASTS_functionJson | Set-Content -Path "$workingDirectory/function/MTASTS/function.json" -Force
-        ### Adding PSMTASTS_runPs1 variable to local scope, so we can adjust it without changing the script variable
-        $local:PSMTASTS_runPs1 = $script:PSMTASTS_runPs1
-        if ($PolicyMode -ne "enforce") {
-            $local:PSMTASTS_runPs1 = $local:PSMTASTS_runPs1.replace("mode: enforce", "mode: $($PolicyMode.ToLower())")
-        }
-        ### Add ExoHostName to run.ps1. We will add all specified hostnames to the MTA-STS policy.
-        [string]$mxHostNames = "mx: *.mail.protection.outlook.com`n" # Add default MX record, which is always added
-        foreach ($hostName in $ExoHostName) {
-            $mxHostNames += "mx: $hostName`n" # Add MX record for each specified hostname
-        }
-        $local:PSMTASTS_runPs1 = $local:PSMTASTS_runPs1.replace("~mxRecords~", ($mxHostNames.TrimEnd("`n"))) # Replace placeholder with MX records
-        $null = $local:PSMTASTS_runPs1 | Set-Content -Path "$workingDirectory/function/MTASTS/run.ps1" -Force
+            ## MTA-STS Policy function
+            $null = New-Item -Path "$workingDirectory/function/MTASTS" -ItemType Directory
+            $null = $script:PSMTASTS_functionJson | Set-Content -Path "$workingDirectory/function/MTASTS/function.json" -Force
+            ### Adding PSMTASTS_runPs1 variable to local scope, so we can adjust it without changing the script variable
+            $local:PSMTASTS_runPs1 = $script:PSMTASTS_runPs1
+            if ($PolicyMode -ne "enforce") {
+                $local:PSMTASTS_runPs1 = $local:PSMTASTS_runPs1.replace("mode: enforce", "mode: $($PolicyMode.ToLower())")
+            }
+            ### Add ExoHostName to run.ps1. We will add all specified hostnames to the MTA-STS policy.
+            [string]$mxHostNames = "mx: *.mail.protection.outlook.com`n" # Add default MX record, which is always added
+            foreach ($hostName in $ExoHostName) {
+                $mxHostNames += "mx: $hostName`n" # Add MX record for each specified hostname
+            }
+            $local:PSMTASTS_runPs1 = $local:PSMTASTS_runPs1.replace("~mxRecords~", ($mxHostNames.TrimEnd("`n"))) # Replace placeholder with MX records
+            $null = $local:PSMTASTS_runPs1 | Set-Content -Path "$workingDirectory/function/MTASTS/run.ps1" -Force
         
-        ## Create Zip
-        if ($PSCmdlet.ShouldProcess("Zip Function App", "Create")) {
-            $null = Compress-Archive -Path "$workingDirectory/function/*" -DestinationPath "$workingDirectory/Function.zip" -Force
-        }
+            ## Create Zip
+            if ($PSCmdlet.ShouldProcess("Zip Function App", "Create")) {
+                $null = Compress-Archive -Path "$workingDirectory/function/*" -DestinationPath "$workingDirectory/Function.zip" -Force
+            }
 
-        # Upload PowerShell code to Azure Function App
-        Write-Verbose "Uploading PowerShell code to Azure Function App $($FunctionAppName)..."
-        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update")) {
-            $null = Publish-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -ArchivePath "$workingDirectory/Function.zip" -Confirm:$false -Force
-        }
+            # Upload PowerShell code to Azure Function App
+            Write-Verbose "Uploading PowerShell code to Azure Function App $($FunctionAppName)..."
+            if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update")) {
+                $null = Publish-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -ArchivePath "$workingDirectory/Function.zip" -Confirm:$false -Force
+            }
 
-        # Set FTP disabled
-        Write-Verbose "Disabling FTP for Azure Function App $($FunctionAppName)..."
-        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update runtime/security settings")) {
-            $null = Set-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -FtpsState Disabled -WarningAction SilentlyContinue
-        }
+            # Set FTP disabled
+            Write-Verbose "Disabling FTP for Azure Function App $($FunctionAppName)..."
+            if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update runtime/security settings")) {
+                $null = Set-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -FtpsState Disabled -WarningAction SilentlyContinue
+            }
 
-        # Set TLS Version 1.3 and PowerShell Version 7.6
-        Write-Verbose "Setting TLS Version to 1.2 / PowerShell Version to 7.6"
-        if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update TLS 1.2 and PowerShell 7.6")) {
-            $subscriptionId = (Get-AzContext).Subscription.Id
-            $body = @{
-                properties = @{
-                    minTlsVersion     = "1.2"
-                    scmMinTlsVersion  = "1.2"
-                    powerShellVersion = "7.6"
-                }
-            } | ConvertTo-Json -Depth 3
+            # Set TLS Version 1.3 and PowerShell Version 7.6
+            Write-Verbose "Setting TLS Version to 1.2 / PowerShell Version to 7.6"
+            if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Update TLS 1.2 and PowerShell 7.6")) {
+                $subscriptionId = (Get-AzContext).Subscription.Id
+                $body = @{
+                    properties = @{
+                        minTlsVersion     = "1.2"
+                        scmMinTlsVersion  = "1.2"
+                        powerShellVersion = "7.6"
+                    }
+                } | ConvertTo-Json -Depth 3
 
-            $path = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Web/sites/$FunctionAppName/config/web?api-version=2026-07-15"
-            $null = Invoke-AzRestMethod -Method PATCH -Path $path -Payload $body
-        }
+                $path = "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Web/sites/$FunctionAppName/config/web?api-version=2026-07-15"
+                $null = Invoke-AzRestMethod -Method PATCH -Path $path -Payload $body
+            }
 
-        # Clean up
-        Write-Verbose "Cleanup Temp Folder"
-        if (Test-Path -Path $workingDirectory) {
-            $null = Get-ChildItem -Path $workingDirectory -Recurse | Remove-Item -Recurse -Force -Confirm:$false
-        }
-
-        #Upate Strage Account to TLS 1.2
-        Write-Verbose "Update Storage Account to TLS 1.2"
-        $FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
+            #Upate Strage Account to TLS 1.2
+            Write-Verbose "Update Storage Account to TLS 1.2"
+            $FunctionAppSetting = Get-AzFunctionAppSetting -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -WarningAction SilentlyContinue
         
-        $StorageAccountName = $null
-        $contentConn = $FunctionAppSetting["WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"]
+            $StorageAccountName = $null
+            $contentConn = $FunctionAppSetting["WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"]
         
-        if (-not [string]::IsNullOrWhiteSpace($contentConn) -and $contentConn -match "(^|;)AccountName=([^;]+)") {
-            $StorageAccountName = $matches[2]
-        }
-        
-        if (-not $StorageAccountName) {
-            $jobsConn = $FunctionAppSetting["AzureWebJobsStorage"]
-            if (-not [string]::IsNullOrWhiteSpace($jobsConn) -and $jobsConn -match "(^|;)AccountName=([^;]+)") {
+            if (-not [string]::IsNullOrWhiteSpace($contentConn) -and $contentConn -match "(^|;)AccountName=([^;]+)") {
                 $StorageAccountName = $matches[2]
             }
-        }
         
-        if (-not $StorageAccountName) {
-            $StorageAccountName = $FunctionAppSetting["AzureWebJobsStorage__accountName"]
-        }
+            if (-not $StorageAccountName) {
+                $jobsConn = $FunctionAppSetting["AzureWebJobsStorage"]
+                if (-not [string]::IsNullOrWhiteSpace($jobsConn) -and $jobsConn -match "(^|;)AccountName=([^;]+)") {
+                    $StorageAccountName = $matches[2]
+                }
+            }
         
-        if ($StorageAccountName) {
-            $StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -ErrorAction SilentlyContinue
-            if ($null -ne $StorageAccount) {
-                $null = Set-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -MinimumTlsVersion "TLS1_2" -ErrorAction SilentlyContinue
+            if (-not $StorageAccountName) {
+                $StorageAccountName = $FunctionAppSetting["AzureWebJobsStorage__accountName"]
+            }
+
+            if ($StorageAccountName) {
+                $StorageAccount = Get-AzStorageAccount -ResourceGroupName $ResourceGroupName -StorageAccountName $StorageAccountName -ErrorAction SilentlyContinue
+                if ($null -ne $StorageAccount) {
+                    $null = Set-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -MinimumTlsVersion "TLS1_2" -ErrorAction SilentlyContinue
+                }
+            }
+            else {
+                Write-Warning "Could not determine the storage account name from Function App settings. TLS update skipped."
             }
         }
-        else {
-            Write-Warning "Could not determine the storage account name from Function App settings. TLS update skipped."
+        finally {
+            Write-Verbose "Cleanup Temp Folder"
+            if (Test-Path -LiteralPath $workingDirectory) {
+                $null = Remove-Item -LiteralPath $workingDirectory -Recurse -Force -Confirm:$false -ErrorAction Stop
+            }
         }
     }
 }
