@@ -157,14 +157,13 @@
             HostNames         = $customDomainsToSet
         }
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Remove custom domains")) {
-            $null = Set-AzWebApp @setAzWebApp -WarningAction SilentlyContinue
-        }
+            $null = Set-AzWebApp @setAzWebApp -WarningAction SilentlyContinue -ErrorAction Stop
 
-        # Send telemetry event for actually removed custom domains (skip in WhatIf mode)
-        if ($SendTelemetry -and -not $WhatIfPreference) {
-            foreach ($RemovedCustomDomain in $removeCustomDomains) {
-                $domainName = $RemovedCustomDomain -replace '^mta-sts\.', ''
-                $null =Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "RemoveDomain" -Domain $domainName
+            if ($SendTelemetry) {
+                foreach ($RemovedCustomDomain in $removeCustomDomains) {
+                    $domainName = $RemovedCustomDomain -replace '^mta-sts\.', ''
+                    $null = Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "RemoveDomain" -Domain $domainName
+                }
             }
         }
 

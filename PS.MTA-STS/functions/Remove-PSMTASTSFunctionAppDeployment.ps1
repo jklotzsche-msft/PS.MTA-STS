@@ -152,7 +152,9 @@
             # Get Certificates associated with the Function App
             Write-Verbose "Removing Certificates from Resource Group $ResourceGroupName."
             $webApp = Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName
-            $CertName = ($webApp.HostNameSslStates |  Where-Object { $_.Thumbprint }).Name
+            $boundThumbprints = @($webApp.HostNameSslStates |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_.Thumbprint) } |
+                Select-Object -ExpandProperty Thumbprint -Unique)
 
             # Delete Function App
             Write-Verbose "Deleting Function App $FunctionAppName in Resource Group $ResourceGroupName"
@@ -167,14 +169,14 @@
             $null = Remove-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $AppServicePlan -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
 
             # Remove Certificates from the Resource Group
-            if ($null -ne $CertName) {
-                $Certificates = Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType "Microsoft.Web/certificates"
-                foreach ($Certificate in $Certificates)
-                {
-                    If ($Certificate.Name -match $CertName)
-                    {
-                        $null = Remove-AzResource -ResourceId $Certificate.ResourceId -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-                        Write-Verbose "Removed Certificate $($Certificate.Name) from Resource Group $ResourceGroupName."
+            if ($boundThumbprints.Count -gt 0) {
+                $certificateThumbprints = Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ErrorAction Stop |
+                    Where-Object { $_.Thumbprint -in $boundThumbprints } |
+                    Select-Object -ExpandProperty Thumbprint -Unique
+                foreach ($thumbprint in $certificateThumbprints) {
+                    if ($PSCmdlet.ShouldProcess("Certificate $thumbprint in Resource Group $ResourceGroupName", "Remove certificate")) {
+                        $null = Remove-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ThumbPrint $thumbprint -Confirm:$false -ErrorAction Stop
+                        Write-Verbose "Removed Certificate $thumbprint from Resource Group $ResourceGroupName."
                     }
                 }
             }

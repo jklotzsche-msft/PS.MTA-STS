@@ -215,14 +215,13 @@
             HostNames         = $customDomainsToSet
         }
         if ($PSCmdlet.ShouldProcess("Function App $FunctionAppName", "Add custom domains")) {
-            $null = Set-AzWebApp @setAzWebApp -WarningAction SilentlyContinue
-        }
+            $null = Set-AzWebApp @setAzWebApp -WarningAction SilentlyContinue -ErrorAction Stop
 
-        # Send telemetry event for actually added custom domains
-        if ($SendTelemetry -and -not $WhatIfPreference) {
-            foreach ($AddedCustomDomain in $newCustomDomainsToAdd) {
-                $domainName = $AddedCustomDomain -replace '^mta-sts\.', ''
-                $null = Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain $domainName
+            if ($SendTelemetry) {
+                foreach ($AddedCustomDomain in $newCustomDomainsToAdd) {
+                    $domainName = $AddedCustomDomain -replace '^mta-sts\.', ''
+                    $null = Send-PSMTASTSTelemetry -TelemetryEndpoint "https://mtaststelemetry.azurewebsites.net/telemetry" -EventType "AddDomain" -Domain $domainName
+                }
             }
         }
 

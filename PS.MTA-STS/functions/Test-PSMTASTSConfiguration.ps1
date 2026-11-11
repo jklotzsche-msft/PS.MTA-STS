@@ -215,27 +215,16 @@ max_age: 604800
             # Example: _mta-sts.example.com. IN TXT "v=STSv1; id=20160831085700Z"
             $mtaStsDNSHost = "_mta-sts." + $domain
             If ($UseClassicDNS -eq $true) {
-                $mtaStsTXTRecord = (Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -match "v=STSv1" }).Strings
-                If ($Null -ne $mtaStsTXTRecord)
-                {
-                    If ($mtaStsTXTRecord.Count -gt 1) {
-                        Throw "Multiple MTA-STS TXT records found for $mtaStsDNSHost"
-                    } else {
-                        $mtaStsTXTRecord = $mtaStsTXTRecord.Replace('"', '')
-                    }
-                }
+                $mtaStsAnswers = Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue
             }
             Else {
-                $mtaStsTXTRecord = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDNSHost&type=TXT" | Where-Object { $_.Answer.data -match "v=STSv1" }).Answer.Data
-                If ($Null -ne $mtaStsTXTRecord)
-                {
-                    If ($mtaStsTXTRecord.Count -gt 1){
-                        Throw "Multiple MTA-STS TXT records found for $mtaStsDNSHost"
-                    } else {
-                        $mtaStsTXTRecord = $mtaStsTXTRecord.Replace('"', '')
-                    }
-                }
+                $mtaStsAnswers = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDNSHost&type=TXT").Answer
             }
+            $mtaStsTXTRecords = @($mtaStsAnswers | ConvertFrom-PSMTASTSTxtRecord | Where-Object { $_ -like "v=STSv1;*" })
+            if ($mtaStsTXTRecords.Count -gt 1) {
+                throw "Multiple MTA-STS TXT records found for $mtaStsDNSHost"
+            }
+            $mtaStsTXTRecord = $mtaStsTXTRecords | Select-Object -First 1
 
             if ($mtaStsTXTRecord -and ($mtaStsTXTRecord -like $txtRecordContent)) {
                 $resultObject.MTA_STS_TXTRecord = "OK"
@@ -300,25 +289,15 @@ max_age: 604800
             # Example: _smtp._tls.example.com. IN TXT "v=TLSRPTv1;rua=mailto:reports@example.com"
             $tlsRptDNSHost = "_smtp._tls." + $domain
             If ($UseClassicDNS -eq $true) {
-                $tlsRptRecord = (Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -like "v=TLSRPTv1*" }).Strings
-                If ($Null -ne $tlsRptRecord)
-                {
-                    If ($tlsRptRecord.Count -gt 1) {
-                        Throw "Multiple TLSRPT TXT records found for $tlsRptDNSHost"
-                    } else {
-                        $tlsRptRecord = $tlsRptRecord.Replace('"', '')
-                    }
-                }
+                $tlsRptAnswers = Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue
             } else {
-                $tlsRptRecord = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$tlsRptDNSHost&type=TXT" | Where-Object { $_.Answer.data -like "v=TLSRPTv1*" }).Answer.data
-                If ($Null -ne $tlsRptRecord){
-                    If ($tlsRptRecord.Count -gt 1) {
-                        Throw "Multiple TLSRPT TXT records found for $tlsRptDNSHost"
-                    } else {
-                        $tlsRptRecord = $tlsRptRecord.Replace('"', '')
-                    }
-                }
+                $tlsRptAnswers = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$tlsRptDNSHost&type=TXT").Answer
             }
+            $tlsRptRecords = @($tlsRptAnswers | ConvertFrom-PSMTASTSTxtRecord | Where-Object { $_ -like "v=TLSRPTv1;*" })
+            if ($tlsRptRecords.Count -gt 1) {
+                throw "Multiple TLSRPT TXT records found for $tlsRptDNSHost"
+            }
+            $tlsRptRecord = $tlsRptRecords | Select-Object -First 1
 
             if ($null -ne $tlsRptRecord) {
                 $resultObject.TLSRPT = $tlsRptRecord

@@ -173,12 +173,12 @@
             # Example: _mta-sts.example.com. IN TXT "v=STSv1; id=20160831085700Z"
             $mtaStsDNSHost = "_mta-sts." + $acceptedDomain.DomainName
             If ($UseClassicDNS) {
-                $mtaStsTXTRecord = (Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer | Where-Object { $_.Strings -match "v=STSv1" }).Strings
+                $mtaStsAnswers = Resolve-PSMTASTSDnsName -Name $mtaStsDNSHost -Type TXT -Server $DnsServer
             }
             Else {
-                $DNSAnswer = Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDNSHost&type=TXT"
-                $mtaStsTXTRecord = $DNSAnswer.Answer.data | Where-Object {$_ -match "v=STSv1"}
+                $mtaStsAnswers = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$mtaStsDNSHost&type=TXT").Answer
             }
+            $mtaStsTXTRecord = $mtaStsAnswers | ConvertFrom-PSMTASTSTxtRecord | Where-Object { $_ -like "v=STSv1;*" }
 
             if ($null -ne $mtaStsTXTRecord) {
                 $resultObject.MTA_STS_TXTRecord = $mtaStsTXTRecord -join " | " # Strings are joined, because multiple strings can be returned
@@ -207,15 +207,15 @@
             # Example: _smtp._tls.example.com. IN TXT "v=TLSRPTv1;rua=mailto:reports@example.com"
             $tlsRptDNSHost = "_smtp._tls." + $acceptedDomain.DomainName
             If ($UseClassicDNS) {
-                $tlsRptRecord = (Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue | Where-Object { $_.Strings -like "v=TLSRPTv1*" }).Strings
+                $tlsRptAnswers = Resolve-PSMTASTSDnsName -Name $tlsRptDNSHost -Type TXT -Server $DnsServer -ErrorAction SilentlyContinue
             }
             Else {
-                $DNSAnswer = Invoke-RestMethod -URI "https://dns.google/resolve?name=$tlsRptDNSHost&type=TXT"
-                $tlsRptRecord = $DNSAnswer.Answer.data | Where-Object {$_ -match "v=TLSRPTv1"}
+                $tlsRptAnswers = (Invoke-RestMethod -URI "https://dns.google/resolve?name=$tlsRptDNSHost&type=TXT").Answer
             }
+            $tlsRptRecord = $tlsRptAnswers | ConvertFrom-PSMTASTSTxtRecord | Where-Object { $_ -like "v=TLSRPTv1;*" }
 
             if ($null -ne $tlsRptRecord) {
-                $resultObject.TLSRPT = $tlsRptRecord
+                $resultObject.TLSRPT = $tlsRptRecord -join " | "
             }
 
             # Checking MX Record
