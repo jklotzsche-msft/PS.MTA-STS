@@ -10,7 +10,7 @@ Update-Module -Name PS.MTA-STS
 
 ## Version 1.4.1
 
-The 1.4.0 release of the PS.MTA-STS module includes the following changes and improvements:
+The 1.4.1 release of the PS.MTA-STS module includes the following changes and improvements:
 
 - Updated `PS.MTA-STS.psd1`with the new Version
 - Fixes the `Test-PSMTASTSConfiguration.ps1` function where the TXT Records didn't contain quotes --> Thanks to [BohrenAn](https://github.com/BohrenAn)

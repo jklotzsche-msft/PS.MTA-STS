@@ -174,9 +174,9 @@
             # Remove only the custom certificates that are associated with this function app.
             #[Array]$ResourceCertificateResources = @(Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType 'Microsoft.Web/certificates' -ErrorAction SilentlyContinue)
             [Array]$WebAppCertificates = Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue
-            Foreach ($certificate in $WebAppCertificates) {
-                $CertificateThumbprint = $certificate.Thumbprint
-                If ($CertificateThumbprint -match $BoundCertificates.Thumbprint) 
+            Foreach ($Certificate in $WebAppCertificates) {
+                $CertificateThumbprint = $Certificate.Thumbprint
+                If ($BoundCertificates.Thumbprint -match $CertificateThumbprint) 
                 {
                     Write-Verbose "Removing Web App Certificate with Thumbprint $CertificateThumbprint"
                     Remove-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -Thumbprint $CertificateThumbprint
