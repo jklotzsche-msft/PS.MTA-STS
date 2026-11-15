@@ -42,7 +42,7 @@
     #>
 
     #region Parameter
-    [CmdletBinding(SupportsShouldProcess = $true)]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Low')]
     Param (
         [Parameter(Mandatory = $true)]
         [ValidateScript({
@@ -160,7 +160,7 @@
                         $_.Trim().ToUpperInvariant() -replace '\s+', ''
                     }
                     else {
-                        $_
+                        [string]$_
                     }
                 })
             if ($boundThumbprints.Count -gt 0) {
@@ -168,52 +168,62 @@
             }
 
             # Remove only the custom certificates that are associated with this function app.
-            # This is done before deleting the app so the certificate can still be found and deleted by thumbprint.
-            $certificateResources = @(Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue |
-                Where-Object { $_ -and $_.PSObject.Properties.Name -contains 'Thumbprint' })
+            # We intentionally match the ARM certificate resources by thumbprint because Azure can leave
+            # the App Service certificate resource behind even when the app binding is already removed.
             $resourceCertificateResources = @(Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType 'Microsoft.Web/certificates' -ErrorAction SilentlyContinue)
-            $allCertificateResources = @($certificateResources + $resourceCertificateResources)
+            $legacyCertificateResources = @(Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue)
+            $certificateResources = @($resourceCertificateResources + $legacyCertificateResources)
             $deletedCertificateResourceIds = @()
 
-            if ($allCertificateResources.Count -gt 0 -and $normalizedBoundThumbprints.Count -gt 0) {
-                $certificateThumbprints = @(
-                    $allCertificateResources |
-                    Where-Object {
-                        $thumbprint = $_.Thumbprint
-                        if ([string]::IsNullOrWhiteSpace($thumbprint)) {
-                            $thumbprint = $_.Properties.Thumbprint
-                        }
-                        if ([string]::IsNullOrWhiteSpace($thumbprint)) {
-                            return $false
-                        }
-                        return ($normalizedBoundThumbprints -contains ($thumbprint.Trim().ToUpperInvariant() -replace '\s+', ''))
-                    } |
-                    ForEach-Object {
-                        if ($_.Thumbprint) { $_.Thumbprint } else { $_.Properties.Thumbprint }
-                    } |
-                    Select-Object -Unique
-                )
+            $getCertificateThumbprint = {
+                param($CertificateObject)
+                if ($null -eq $CertificateObject) { return $null }
 
-                foreach ($thumbprint in $certificateThumbprints) {
-                    $certificateResource = $allCertificateResources |
-                        Where-Object {
-                            $candidateThumbprint = $_.Thumbprint
-                            if ([string]::IsNullOrWhiteSpace($candidateThumbprint)) { $candidateThumbprint = $_.Properties.Thumbprint }
-                            return (-not [string]::IsNullOrWhiteSpace($candidateThumbprint) -and ($candidateThumbprint.Trim().ToUpperInvariant() -replace '\s+', '') -eq ($thumbprint.Trim().ToUpperInvariant() -replace '\s+', ''))
-                        } |
-                        Select-Object -First 1
+                $thumbprint = $null
+                $thumbprintProperty = $CertificateObject.PSObject.Properties | Where-Object { $_.Name -ieq 'Thumbprint' } | Select-Object -First 1
+                if ($null -ne $thumbprintProperty) { $thumbprint = $thumbprintProperty.Value }
 
-                    if ($PSCmdlet.ShouldProcess("Certificate $thumbprint in Resource Group $ResourceGroupName", "Remove certificate")) {
-                        $certificateResourceId = $null
-                        if ($certificateResource -and -not [string]::IsNullOrWhiteSpace($certificateResource.Id)) { $certificateResourceId = $certificateResource.Id }
-                        elseif ($certificateResource -and -not [string]::IsNullOrWhiteSpace($certificateResource.ResourceId)) { $certificateResourceId = $certificateResource.ResourceId }
-                        elseif ($certificateResource -and $certificateResource.Properties -and -not [string]::IsNullOrWhiteSpace($certificateResource.Properties.Thumbprint)) { $certificateResourceId = $certificateResource.ResourceId }
+                if ([string]::IsNullOrWhiteSpace($thumbprint) -and $null -ne $CertificateObject.Properties) {
+                    $propertiesThumbprint = $CertificateObject.Properties.PSObject.Properties | Where-Object { $_.Name -ieq 'Thumbprint' } | Select-Object -First 1
+                    if ($null -ne $propertiesThumbprint) { $thumbprint = $propertiesThumbprint.Value }
+                }
 
+                return $thumbprint
+            }
+
+            $getCertificateResourceId = {
+                param($CertificateObject)
+                if ($null -eq $CertificateObject) { return $null }
+
+                $resourceId = $null
+                $idProperty = $CertificateObject.PSObject.Properties | Where-Object { $_.Name -ieq 'ResourceId' } | Select-Object -First 1
+                if ($null -ne $idProperty) { $resourceId = $idProperty.Value }
+
+                if ([string]::IsNullOrWhiteSpace($resourceId)) {
+                    $idProperty = $CertificateObject.PSObject.Properties | Where-Object { $_.Name -ieq 'Id' } | Select-Object -First 1
+                    if ($null -ne $idProperty) { $resourceId = $idProperty.Value }
+                }
+
+                return $resourceId
+            }
+
+            if ($certificateResources.Count -gt 0 -and $normalizedBoundThumbprints.Count -gt 0) {
+                foreach ($certificateResource in $certificateResources) {
+                    $certificateThumbprint = & $getCertificateThumbprint $certificateResource
+                    if ([string]::IsNullOrWhiteSpace($certificateThumbprint)) {
+                        continue
+                    }
+
+                    $normalizedCertificateThumbprint = ($certificateThumbprint.Trim().ToUpperInvariant() -replace '\s+', '')
+                    if ($normalizedBoundThumbprints -contains $normalizedCertificateThumbprint) {
+                        $certificateResourceId = & $getCertificateResourceId $certificateResource
                         if (-not [string]::IsNullOrWhiteSpace($certificateResourceId) -and $deletedCertificateResourceIds -notcontains $certificateResourceId) {
-                            $null = Remove-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ThumbPrint $thumbprint -Confirm:$false -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-                            $null = Remove-AzResource -ResourceId $certificateResourceId -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-                            $deletedCertificateResourceIds += $certificateResourceId
-                            Write-Verbose "Removed Certificate $thumbprint from Resource Group $ResourceGroupName."
+                            if ($PSCmdlet.ShouldProcess("Certificate $certificateThumbprint in Resource Group $ResourceGroupName", "Remove certificate")) {
+                                $null = Remove-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ThumbPrint $certificateThumbprint -Confirm:$false -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                                $null = Remove-AzResource -ResourceId $certificateResourceId -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                                $deletedCertificateResourceIds += $certificateResourceId
+                                Write-Verbose "Removed Certificate $certificateThumbprint from Resource Group $ResourceGroupName."
+                            }
                         }
                     }
                 }
@@ -232,33 +242,22 @@
             $null = Remove-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $AppServicePlan -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
 
             # Final cleanup pass in case Azure did not fully remove the bound certificate during app deletion.
-            $postDeleteCertificateResources = @(
-                Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue |
-                    Where-Object { $_ -and $_.PSObject.Properties.Name -contains 'Thumbprint' }
-            )
-            $postDeleteResourceCertificateResources = @(Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType 'Microsoft.Web/certificates' -ErrorAction SilentlyContinue)
-            $postDeleteAllCertificateResources = @($postDeleteCertificateResources + $postDeleteResourceCertificateResources)
-            if ($postDeleteAllCertificateResources.Count -gt 0 -and $normalizedBoundThumbprints.Count -gt 0) {
-                foreach ($thumbprint in $boundThumbprints) {
-                    $normalizedThumbprint = ($thumbprint.Trim().ToUpperInvariant() -replace '\s+', '')
-                    $remainingCertificate = $postDeleteAllCertificateResources |
-                        Where-Object {
-                            $candidateThumbprint = $_.Thumbprint
-                            if ([string]::IsNullOrWhiteSpace($candidateThumbprint)) { $candidateThumbprint = $_.Properties.Thumbprint }
-                            if ([string]::IsNullOrWhiteSpace($candidateThumbprint)) { return $false }
-                            return (($candidateThumbprint.Trim().ToUpperInvariant() -replace '\s+', '') -eq $normalizedThumbprint)
-                        } |
-                        Select-Object -First 1
+            $postDeleteCertificateResources = @(Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType 'Microsoft.Web/certificates' -ErrorAction SilentlyContinue)
+            if ($postDeleteCertificateResources.Count -gt 0 -and $normalizedBoundThumbprints.Count -gt 0) {
+                foreach ($certificateResource in $postDeleteCertificateResources) {
+                    $certificateThumbprint = & $getCertificateThumbprint $certificateResource
+                    if ([string]::IsNullOrWhiteSpace($certificateThumbprint)) {
+                        continue
+                    }
 
-                    if ($null -ne $remainingCertificate) {
-                        $remainingCertificateId = $null
-                        if (-not [string]::IsNullOrWhiteSpace($remainingCertificate.Id)) { $remainingCertificateId = $remainingCertificate.Id }
-                        elseif (-not [string]::IsNullOrWhiteSpace($remainingCertificate.ResourceId)) { $remainingCertificateId = $remainingCertificate.ResourceId }
+                    $normalizedCertificateThumbprint = ($certificateThumbprint.Trim().ToUpperInvariant() -replace '\s+', '')
+                    if ($normalizedBoundThumbprints -contains $normalizedCertificateThumbprint) {
+                        $remainingCertificateId = & $getCertificateResourceId $certificateResource
 
                         if (-not [string]::IsNullOrWhiteSpace($remainingCertificateId) -and $deletedCertificateResourceIds -notcontains $remainingCertificateId) {
                             $null = Remove-AzResource -ResourceId $remainingCertificateId -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
                             $deletedCertificateResourceIds += $remainingCertificateId
-                            Write-Verbose "Removed remaining certificate $thumbprint from Resource Group $ResourceGroupName after app deletion."
+                            Write-Verbose "Removed remaining certificate $certificateThumbprint from Resource Group $ResourceGroupName after app deletion."
                         }
                     }
                 }
