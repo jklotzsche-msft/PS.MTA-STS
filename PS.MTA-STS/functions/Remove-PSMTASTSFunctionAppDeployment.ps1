@@ -170,9 +170,15 @@
 
             # Remove Certificates from the Resource Group
             if ($boundThumbprints.Count -gt 0) {
-                $certificateThumbprints = @(Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ErrorAction Stop |
+                $certificateThumbprints = @(
+                    Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ErrorAction Stop |
+                    Where-Object {
+                        $_ -and $_.PSObject.Properties.Name -contains 'Thumbprint'
+                    } |
                     Where-Object { $_.Thumbprint -in $boundThumbprints } |
-                    Select-Object -ExpandProperty Thumbprint -Unique)
+                    ForEach-Object { $_.Thumbprint } |
+                    Select-Object -Unique
+                )
                 foreach ($thumbprint in $certificateThumbprints) {
                     if ($PSCmdlet.ShouldProcess("Certificate $thumbprint in Resource Group $ResourceGroupName", "Remove certificate")) {
                         $null = Remove-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ThumbPrint $thumbprint -Confirm:$false -ErrorAction Stop

@@ -68,6 +68,37 @@
                 $script:removedThumbprint | Should -Be 'ABC123'
             }
         }
+
+        It "ignores certificate entries without thumbprint metadata when removing bound certificates" {
+            InModuleScope PS.MTA-STS {
+                Mock Get-AzFunctionApp {
+                    [pscustomobject]@{ AppServicePlan = 'test-plan'; Name = $Name }
+                }
+                Mock Get-AzFunctionAppSetting {
+                    @{ 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING' = 'DefaultEndpointsProtocol=https;AccountName=reviewstore;AccountKey=abc' }
+                }
+                Mock Get-AzWebApp {
+                    [pscustomobject]@{ HostNameSslStates = @([pscustomobject]@{ Thumbprint = 'ABC123' }) }
+                }
+                Mock Remove-AzFunctionApp {}
+                Mock Remove-AzStorageAccount {}
+                Mock Remove-AzAppServicePlan {}
+                Mock Get-AzApplicationInsights { @() }
+                Mock Get-AzResource { @() }
+                Mock Get-AzWebAppCertificate {
+                    @(
+                        [pscustomobject]@{ Name = 'not-a-certificate' },
+                        [pscustomobject]@{ Thumbprint = 'ABC123' }
+                    )
+                }
+                Mock Remove-AzWebAppCertificate {
+                    $script:removedThumbprint = $ThumbPrint
+                }
+
+                Remove-PSMTASTSFunctionAppDeployment -ResourceGroupName 'rg-test' -FunctionAppName 'func-test' -StorageAccountName 'reviewstore' -Confirm:$false
+                $script:removedThumbprint | Should -Be 'ABC123'
+            }
+        }
     }
 
     Context "Individual file validation" {
