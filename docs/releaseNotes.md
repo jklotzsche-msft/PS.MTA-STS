@@ -13,9 +13,9 @@ Update-Module -Name PS.MTA-STS
 The 1.4.0 release of the PS.MTA-STS module includes the following changes and improvements:
 
 - Updated `PS.MTA-STS.psd1`with the new Version
-- Fixes the `Test-PSMTASTSConfiguration.ps1` function where the TXT Records didn't contain quotes
-- Fixes the `Remove-PSMTASTSFunctionAppDeployment.ps1` function where custom Certificates where not removed
-- Fixes the `Export-PSMTASTSDomainsFromExo.ps1` function where where the TXT Records didn't contain quotes
+- Fixes the `Test-PSMTASTSConfiguration.ps1` function where the TXT Records didn't contain quotes --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- Fixes the `Remove-PSMTASTSFunctionAppDeployment.ps1` function where custom Certificates where not removed --> Thanks to [BohrenAn](https://github.com/BohrenAn)
+- Fixes the `Export-PSMTASTSDomainsFromExo.ps1` function where where the TXT Records didn't contain quotes --> Thanks to [BohrenAn](https://github.com/BohrenAn)
 
 ## Version 1.4.0
 
