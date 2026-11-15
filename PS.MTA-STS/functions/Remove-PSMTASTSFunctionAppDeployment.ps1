@@ -150,11 +150,14 @@
             }
 
             # Get Certificates associated with the Function App
-            Write-Verbose "Removing Certificates from Resource Group $ResourceGroupName."
+            Write-Verbose "Get Certificates from Resource Group $ResourceGroupName."
             $webApp = Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName
             $boundThumbprints = @($webApp.HostNameSslStates |
                 Where-Object { -not [string]::IsNullOrWhiteSpace($_.Thumbprint) } |
                 Select-Object -ExpandProperty Thumbprint -Unique)
+            if ($boundThumbprints.Count -gt 0) {
+                Write-Verbose "Bound certificate thumbprints: $($boundThumbprints -join ', ')"
+            }
 
             # Delete Function App
             Write-Verbose "Deleting Function App $FunctionAppName in Resource Group $ResourceGroupName"
@@ -168,22 +171,18 @@
             Write-Verbose "Deleting App Service Plan $AppServicePlan in Resource Group $ResourceGroupName"
             $null = Remove-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $AppServicePlan -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
 
-            # Remove Certificates from the Resource Group
+            # Remove only the custom certificates that are associated with this function app.
+            # The App Service binding is the authoritative source of which certificates belong to it.
             $certificateResources = @(Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ErrorAction Stop |
                 Where-Object { $_ -and $_.PSObject.Properties.Name -contains 'Thumbprint' })
 
-            if ($certificateResources.Count -gt 0) {
+            if ($certificateResources.Count -gt 0 -and $boundThumbprints.Count -gt 0) {
                 $certificateThumbprints = @(
-                    if ($boundThumbprints.Count -gt 0) {
-                        $certificateResources |
-                            Where-Object { $_.Thumbprint -in $boundThumbprints } |
-                            ForEach-Object { $_.Thumbprint }
-                    }
-                    else {
-                        $certificateResources |
-                            ForEach-Object { $_.Thumbprint }
-                    }
-                ) | Select-Object -Unique
+                    $certificateResources |
+                        Where-Object { $_.Thumbprint -in $boundThumbprints } |
+                        ForEach-Object { $_.Thumbprint } |
+                        Select-Object -Unique
+                )
 
                 foreach ($thumbprint in $certificateThumbprints) {
                     if ($PSCmdlet.ShouldProcess("Certificate $thumbprint in Resource Group $ResourceGroupName", "Remove certificate")) {

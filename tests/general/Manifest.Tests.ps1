@@ -100,7 +100,7 @@
             }
         }
 
-        It "removes certificate resources in the resource group when the app is not currently bound to a certificate" {
+        It "does not remove unrelated certificate resources from the resource group" {
             InModuleScope PS.MTA-STS {
                 Mock Get-AzFunctionApp {
                     [pscustomobject]@{ AppServicePlan = 'test-plan'; Name = $Name }
@@ -109,7 +109,7 @@
                     @{ 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING' = 'DefaultEndpointsProtocol=https;AccountName=reviewstore;AccountKey=abc' }
                 }
                 Mock Get-AzWebApp {
-                    [pscustomobject]@{ HostNameSslStates = @() }
+                    [pscustomobject]@{ HostNameSslStates = @([pscustomobject]@{ Thumbprint = 'ABC123' }) }
                 }
                 Mock Remove-AzFunctionApp {}
                 Mock Remove-AzStorageAccount {}
@@ -118,8 +118,8 @@
                 Mock Get-AzResource { @() }
                 Mock Get-AzWebAppCertificate {
                     @(
-                        [pscustomobject]@{ Thumbprint = 'CUSTOM123' },
-                        [pscustomobject]@{ Thumbprint = 'CUSTOM456' }
+                        [pscustomobject]@{ Thumbprint = 'ABC123' },
+                        [pscustomobject]@{ Thumbprint = 'OTHER456' }
                     )
                 }
                 Mock Remove-AzWebAppCertificate {
@@ -127,7 +127,7 @@
                 }
 
                 Remove-PSMTASTSFunctionAppDeployment -ResourceGroupName 'rg-test' -FunctionAppName 'func-test' -StorageAccountName 'reviewstore' -Confirm:$false
-                @($script:removedThumbprints | Sort-Object) | Should -Be @('CUSTOM123', 'CUSTOM456')
+                @($script:removedThumbprints | Sort-Object) | Should -Be @('ABC123')
             }
         }
     }
