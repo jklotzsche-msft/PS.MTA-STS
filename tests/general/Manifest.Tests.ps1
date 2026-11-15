@@ -1,6 +1,8 @@
 ﻿Describe "Validating the module manifest" {
     $moduleRoot = (Resolve-Path "$global:testroot\..\PS.MTA-STS").Path
     $manifest = ((Get-Content "$moduleRoot\PS.MTA-STS.psd1") -join "`n") | Invoke-Expression
+    . "$moduleRoot\internal\functions\ConvertFrom-PSMTASTSTxtRecord.ps1"
+
     Context "Basic resources validation" {
         $files = Get-ChildItem "$moduleRoot\functions" -Recurse -File | Where-Object Name -like "*.ps1"
         It "Exports all functions in the public folder" -TestCases @{ files = $files; manifest = $manifest } {
@@ -19,6 +21,17 @@
         }
     }
     
+    Context "TXT record decoding validation" {
+        It "accepts plain unquoted DNS TXT payloads" {
+            $record = [pscustomobject]@{ Type = 16; Data = 'v=STSv1; id=20261111000000Z;' }
+            ($record | ConvertFrom-PSMTASTSTxtRecord) | Should -Be 'v=STSv1; id=20261111000000Z;'
+        }
+
+        It "rejects malformed DNS TXT presentation data" {
+            { [pscustomobject]@{ Type = 16; Data = '"unterminated' } | ConvertFrom-PSMTASTSTxtRecord } | Should -Throw '*Malformed DNS TXT*'
+        }
+    }
+
     Context "Individual file validation" {
         It "The root module file exists" -TestCases @{ moduleRoot = $moduleRoot; manifest = $manifest } {
             Test-Path "$moduleRoot\$($manifest.RootModule)" | Should -Be $true

@@ -30,9 +30,18 @@
             }
             elseif ($InputObject.Type -eq 16) {
                 $data = [string]$InputObject.Data
+                $trimmedData = $data.Trim()
+                if ($trimmedData.Length -eq 0) {
+                    return
+                }
+
+                if ($trimmedData -notmatch '"') {
+                    return $trimmedData
+                }
+
                 $pattern = '"((?:\\.|[^"\\])*)"'
-                $segments = [regex]::Matches($data, $pattern)
-                if ($segments.Count -eq 0 -or [regex]::Replace($data, $pattern, '').Trim().Length -gt 0) {
+                $segments = [regex]::Matches($trimmedData, $pattern)
+                if ($segments.Count -eq 0 -or [regex]::Replace($trimmedData, $pattern, '').Trim().Length -gt 0) {
                     throw 'Malformed DNS TXT presentation data: expected quoted character strings.'
                 }
 
