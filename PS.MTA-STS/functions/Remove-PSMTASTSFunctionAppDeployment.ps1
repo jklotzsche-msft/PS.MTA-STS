@@ -159,22 +159,11 @@
                 Write-Verbose "Bound certificate thumbprints: $($boundThumbprints -join ', ')"
             }
 
-            # Delete Function App
-            Write-Verbose "Deleting Function App $FunctionAppName in Resource Group $ResourceGroupName"
-            $null = Remove-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-
-            # Delete Storage Account
-            Write-Verbose "Deleting Storage Account $StorageAccountName in Resource Group $ResourceGroupName"
-            $null = Remove-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-
-            # Delete App Service Plan
-            Write-Verbose "Deleting App Service Plan $AppServicePlan in Resource Group $ResourceGroupName"
-            $null = Remove-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $AppServicePlan -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-
             # Remove only the custom certificates that are associated with this function app.
-            # The App Service binding is the authoritative source of which certificates belong to it.
+            # This is done before deleting the app so the certificate can still be found and deleted by thumbprint.
             $certificateResources = @(Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ErrorAction Stop |
                 Where-Object { $_ -and $_.PSObject.Properties.Name -contains 'Thumbprint' })
+            $deletedCertificateResourceIds = @()
 
             if ($certificateResources.Count -gt 0 -and $boundThumbprints.Count -gt 0) {
                 $certificateThumbprints = @(
@@ -188,9 +177,40 @@
                     $certificateResource = $certificateResources | Where-Object { $_.Thumbprint -eq $thumbprint } | Select-Object -First 1
                     if ($PSCmdlet.ShouldProcess("Certificate $thumbprint in Resource Group $ResourceGroupName", "Remove certificate")) {
                         if ($null -ne $certificateResource -and -not [string]::IsNullOrWhiteSpace($certificateResource.Id)) {
-                            $null = Remove-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ThumbPrint $thumbprint -Confirm:$false -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-                            $null = Remove-AzResource -ResourceId $certificateResource.Id -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-                            Write-Verbose "Removed Certificate $thumbprint from Resource Group $ResourceGroupName."
+                            if ($deletedCertificateResourceIds -notcontains $certificateResource.Id) {
+                                $null = Remove-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ThumbPrint $thumbprint -Confirm:$false -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                                $null = Remove-AzResource -ResourceId $certificateResource.Id -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                                $deletedCertificateResourceIds += $certificateResource.Id
+                                Write-Verbose "Removed Certificate $thumbprint from Resource Group $ResourceGroupName."
+                            }
+                        }
+                    }
+                }
+            }
+
+            # Delete Function App
+            Write-Verbose "Deleting Function App $FunctionAppName in Resource Group $ResourceGroupName"
+            $null = Remove-AzFunctionApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+
+            # Delete Storage Account
+            Write-Verbose "Deleting Storage Account $StorageAccountName in Resource Group $ResourceGroupName"
+            $null = Remove-AzStorageAccount -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+
+            # Delete App Service Plan
+            Write-Verbose "Deleting App Service Plan $AppServicePlan in Resource Group $ResourceGroupName"
+            $null = Remove-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $AppServicePlan -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+
+            # Final cleanup pass in case Azure did not fully remove the bound certificate during app deletion.
+            $postDeleteCertificateResources = @(Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue |
+                Where-Object { $_ -and $_.PSObject.Properties.Name -contains 'Thumbprint' })
+            if ($postDeleteCertificateResources.Count -gt 0 -and $boundThumbprints.Count -gt 0) {
+                foreach ($thumbprint in $boundThumbprints) {
+                    $remainingCertificate = $postDeleteCertificateResources | Where-Object { $_.Thumbprint -eq $thumbprint } | Select-Object -First 1
+                    if ($null -ne $remainingCertificate -and -not [string]::IsNullOrWhiteSpace($remainingCertificate.Id)) {
+                        if ($deletedCertificateResourceIds -notcontains $remainingCertificate.Id) {
+                            $null = Remove-AzResource -ResourceId $remainingCertificate.Id -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                            $deletedCertificateResourceIds += $remainingCertificate.Id
+                            Write-Verbose "Removed remaining certificate $thumbprint from Resource Group $ResourceGroupName after app deletion."
                         }
                     }
                 }
