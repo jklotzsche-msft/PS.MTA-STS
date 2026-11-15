@@ -152,6 +152,45 @@
             }
         }
 
+        It "removes a bound certificate when the certificate resource exposes ResourceId instead of Id" {
+            InModuleScope PS.MTA-STS {
+                $script:removedResourceIds = @()
+
+                Mock Get-AzFunctionApp {
+                    [pscustomobject]@{ AppServicePlan = 'test-plan'; Name = $Name }
+                }
+                Mock Get-AzFunctionAppSetting {
+                    @{ 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING' = 'DefaultEndpointsProtocol=https;AccountName=reviewstore;AccountKey=abc' }
+                }
+                Mock Get-AzWebApp {
+                    [pscustomobject]@{ HostNameSslStates = @([pscustomobject]@{ Thumbprint = 'ABC123' }) }
+                }
+                Mock Remove-AzFunctionApp {}
+                Mock Remove-AzStorageAccount {}
+                Mock Remove-AzAppServicePlan {}
+                Mock Get-AzApplicationInsights { @() }
+                Mock Get-AzWebAppCertificate { @() }
+                Mock Get-AzResource {
+                    param($ResourceGroupName, $ResourceType)
+                    if ($ResourceType -ieq 'Microsoft.Web/certificates') {
+                        @(
+                            [pscustomobject]@{ ResourceId = '/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Web/certificates/abc'; Properties = [pscustomobject]@{ Thumbprint = 'ABC123' } }
+                        )
+                    }
+                    else {
+                        @()
+                    }
+                }
+                Mock Remove-AzWebAppCertificate {}
+                Mock Remove-AzResource {
+                    $script:removedResourceIds = @($script:removedResourceIds + $ResourceId)
+                }
+
+                Remove-PSMTASTSFunctionAppDeployment -ResourceGroupName 'rg-test' -FunctionAppName 'func-test' -StorageAccountName 'reviewstore' -Confirm:$false
+                @($script:removedResourceIds | Sort-Object) | Should -Be @('/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Web/certificates/abc')
+            }
+        }
+
         It "deletes the matching certificate resource by resource-id even when the app certificate cmdlet is non-destructive" {
             InModuleScope PS.MTA-STS {
                 $script:removedThumbprints = @()
