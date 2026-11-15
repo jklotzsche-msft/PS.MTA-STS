@@ -27,6 +27,11 @@
             ($record | ConvertFrom-PSMTASTSTxtRecord) | Should -Be 'v=STSv1; id=20261111000000Z;'
         }
 
+        It "accepts plain unquoted DNS TXT payloads when returned as an array" {
+            $record = [pscustomobject]@{ Type = 16; Data = @('v=STSv1; id=20261111000000Z;') }
+            ($record | ConvertFrom-PSMTASTSTxtRecord) | Should -Be 'v=STSv1; id=20261111000000Z;'
+        }
+
         It "rejects malformed DNS TXT presentation data" {
             { [pscustomobject]@{ Type = 16; Data = '"unterminated' } | ConvertFrom-PSMTASTSTxtRecord } | Should -Throw '*Malformed DNS TXT*'
         }

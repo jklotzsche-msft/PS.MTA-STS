@@ -8,6 +8,15 @@ To update the module to the latest version, use the following command:
 Update-Module -Name PS.MTA-STS
 ```
 
+## Version 1.4.1
+
+The 1.4.0 release of the PS.MTA-STS module includes the following changes and improvements:
+
+- Updated `PS.MTA-STS.psd1`with the new Version
+- Fixes the `Test-PSMTASTSConfiguration.ps1` function where the TXT Records didn't contain quotes
+- Fixes the `Remove-PSMTASTSFunctionAppDeployment.ps1` function where custom Certificates where not removed
+- Fixes the `Export-PSMTASTSDomainsFromExo.ps1` function where where the TXT Records didn't contain quotes
+
 ## Version 1.4.0
 
 The 1.4.0 release of the PS.MTA-STS module includes (but is not limited to) the following changes and improvements:
