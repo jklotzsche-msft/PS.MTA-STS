@@ -187,18 +187,10 @@
                 foreach ($thumbprint in $certificateThumbprints) {
                     $certificateResource = $certificateResources | Where-Object { $_.Thumbprint -eq $thumbprint } | Select-Object -First 1
                     if ($PSCmdlet.ShouldProcess("Certificate $thumbprint in Resource Group $ResourceGroupName", "Remove certificate")) {
-                        try {
-                            $null = Remove-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ThumbPrint $thumbprint -Confirm:$false -ErrorAction Stop
+                        if ($null -ne $certificateResource -and -not [string]::IsNullOrWhiteSpace($certificateResource.Id)) {
+                            $null = Remove-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ThumbPrint $thumbprint -Confirm:$false -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+                            $null = Remove-AzResource -ResourceId $certificateResource.Id -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
                             Write-Verbose "Removed Certificate $thumbprint from Resource Group $ResourceGroupName."
-                        }
-                        catch {
-                            if ($null -ne $certificateResource -and -not [string]::IsNullOrWhiteSpace($certificateResource.Id)) {
-                                Write-Verbose "Remove-AzWebAppCertificate failed for $thumbprint. Falling back to resource deletion via ResourceId."
-                                $null = Remove-AzResource -ResourceId $certificateResource.Id -Force -ErrorAction Stop -WarningAction SilentlyContinue
-                            }
-                            else {
-                                throw
-                            }
                         }
                     }
                 }

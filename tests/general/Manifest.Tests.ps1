@@ -43,6 +43,9 @@
 
         It "removes a single bound certificate by thumbprint" {
             InModuleScope PS.MTA-STS {
+                $script:removedThumbprint = $null
+                $script:removedResourceId = $null
+
                 Mock Get-AzFunctionApp {
                     [pscustomobject]@{ AppServicePlan = 'test-plan'; Name = $Name }
                 }
@@ -58,19 +61,26 @@
                 Mock Get-AzApplicationInsights { @() }
                 Mock Get-AzResource { @() }
                 Mock Get-AzWebAppCertificate {
-                    @([pscustomobject]@{ Thumbprint = 'ABC123' })
+                    @([pscustomobject]@{ Thumbprint = 'ABC123'; Id = '/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Web/certificates/abc' })
                 }
                 Mock Remove-AzWebAppCertificate {
                     $script:removedThumbprint = $ThumbPrint
                 }
+                Mock Remove-AzResource {
+                    $script:removedResourceId = $ResourceId
+                }
 
                 Remove-PSMTASTSFunctionAppDeployment -ResourceGroupName 'rg-test' -FunctionAppName 'func-test' -StorageAccountName 'reviewstore' -Confirm:$false
                 $script:removedThumbprint | Should -Be 'ABC123'
+                $script:removedResourceId | Should -Match 'abc'
             }
         }
 
         It "ignores certificate entries without thumbprint metadata when removing bound certificates" {
             InModuleScope PS.MTA-STS {
+                $script:removedThumbprint = $null
+                $script:removedResourceId = $null
+
                 Mock Get-AzFunctionApp {
                     [pscustomobject]@{ AppServicePlan = 'test-plan'; Name = $Name }
                 }
@@ -88,20 +98,27 @@
                 Mock Get-AzWebAppCertificate {
                     @(
                         [pscustomobject]@{ Name = 'not-a-certificate' },
-                        [pscustomobject]@{ Thumbprint = 'ABC123' }
+                        [pscustomobject]@{ Thumbprint = 'ABC123'; Id = '/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Web/certificates/abc' }
                     )
                 }
                 Mock Remove-AzWebAppCertificate {
                     $script:removedThumbprint = $ThumbPrint
                 }
+                Mock Remove-AzResource {
+                    $script:removedResourceId = $ResourceId
+                }
 
                 Remove-PSMTASTSFunctionAppDeployment -ResourceGroupName 'rg-test' -FunctionAppName 'func-test' -StorageAccountName 'reviewstore' -Confirm:$false
                 $script:removedThumbprint | Should -Be 'ABC123'
+                $script:removedResourceId | Should -Match 'abc'
             }
         }
 
         It "does not remove unrelated certificate resources from the resource group" {
             InModuleScope PS.MTA-STS {
+                $script:removedThumbprints = @()
+                $script:removedResourceIds = @()
+
                 Mock Get-AzFunctionApp {
                     [pscustomobject]@{ AppServicePlan = 'test-plan'; Name = $Name }
                 }
@@ -125,14 +142,21 @@
                 Mock Remove-AzWebAppCertificate {
                     $script:removedThumbprints = @($script:removedThumbprints + $ThumbPrint)
                 }
+                Mock Remove-AzResource {
+                    $script:removedResourceIds = @($script:removedResourceIds + $ResourceId)
+                }
 
                 Remove-PSMTASTSFunctionAppDeployment -ResourceGroupName 'rg-test' -FunctionAppName 'func-test' -StorageAccountName 'reviewstore' -Confirm:$false
                 @($script:removedThumbprints | Sort-Object) | Should -Be @('ABC123')
+                @($script:removedResourceIds | Sort-Object) | Should -Be @('/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Web/certificates/abc')
             }
         }
 
-        It "falls back to resource-id deletion when the app certificate cmdlet fails" {
+        It "deletes the matching certificate resource by resource-id even when the app certificate cmdlet is non-destructive" {
             InModuleScope PS.MTA-STS {
+                $script:removedThumbprints = @()
+                $script:removedResourceIds = @()
+
                 Mock Get-AzFunctionApp {
                     [pscustomobject]@{ AppServicePlan = 'test-plan'; Name = $Name }
                 }
@@ -152,13 +176,16 @@
                         [pscustomobject]@{ Thumbprint = 'ABC123'; Id = '/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Web/certificates/abc' }
                     )
                 }
-                Mock Remove-AzWebAppCertificate { throw 'Simulated Azure cmdlet failure' }
+                Mock Remove-AzWebAppCertificate {
+                    $script:removedThumbprints = @($script:removedThumbprints + $ThumbPrint)
+                    # Simulate a non-destructive Azure cmdlet that returns without deleting the resource.
+                }
                 Mock Remove-AzResource {
                     $script:removedResourceIds = @($script:removedResourceIds + $ResourceId)
                 }
 
                 Remove-PSMTASTSFunctionAppDeployment -ResourceGroupName 'rg-test' -FunctionAppName 'func-test' -StorageAccountName 'reviewstore' -Confirm:$false
-                @($script:removedResourceIds) | Should -Be '/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Web/certificates/abc'
+                @($script:removedResourceIds | Sort-Object) | Should -Be @('/subscriptions/test/resourceGroups/rg-test/providers/Microsoft.Web/certificates/abc')
             }
         }
     }
