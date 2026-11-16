@@ -42,7 +42,7 @@
     #>
 
     #region Parameter
-    [CmdletBinding(SupportsShouldProcess = $true)]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Low')]
     Param (
         [Parameter(Mandatory = $true)]
         [ValidateScript({
@@ -150,11 +150,14 @@
             }
 
             # Get Certificates associated with the Function App
-            Write-Verbose "Removing Certificates from Resource Group $ResourceGroupName."
-            $webApp = Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName
-            $boundThumbprints = @($webApp.HostNameSslStates |
-                Where-Object { -not [string]::IsNullOrWhiteSpace($_.Thumbprint) } |
-                Select-Object -ExpandProperty Thumbprint -Unique)
+            Write-Verbose "Get Certificates from Resource Group $ResourceGroupName."
+            $WebApp = Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $FunctionAppName
+            [Array]$BoundCertificates = $webApp.HostNameSslStates | Where-Object {$_.Name -like "mta-sts.*"}
+
+            # Log the thumbprints of the bound certificates for debugging purposes.
+            Foreach ($BoundCertificate in $BoundCertificates) {
+                Write-Verbose "Bound certificate thumbprint: $($BoundCertificate.Thumbprint)"
+            }
 
             # Delete Function App
             Write-Verbose "Deleting Function App $FunctionAppName in Resource Group $ResourceGroupName"
@@ -168,16 +171,15 @@
             Write-Verbose "Deleting App Service Plan $AppServicePlan in Resource Group $ResourceGroupName"
             $null = Remove-AzAppServicePlan -ResourceGroupName $ResourceGroupName -Name $AppServicePlan -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
 
-            # Remove Certificates from the Resource Group
-            if ($boundThumbprints.Count -gt 0) {
-                $certificateThumbprints = Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ErrorAction Stop |
-                    Where-Object { $_.Thumbprint -in $boundThumbprints } |
-                    Select-Object -ExpandProperty Thumbprint -Unique
-                foreach ($thumbprint in $certificateThumbprints) {
-                    if ($PSCmdlet.ShouldProcess("Certificate $thumbprint in Resource Group $ResourceGroupName", "Remove certificate")) {
-                        $null = Remove-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ThumbPrint $thumbprint -Confirm:$false -ErrorAction Stop
-                        Write-Verbose "Removed Certificate $thumbprint from Resource Group $ResourceGroupName."
-                    }
+            # Remove only the custom certificates that are associated with this function app.
+            #[Array]$ResourceCertificateResources = @(Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType 'Microsoft.Web/certificates' -ErrorAction SilentlyContinue)
+            [Array]$WebAppCertificates = Get-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue
+            Foreach ($Certificate in $WebAppCertificates) {
+                $CertificateThumbprint = $Certificate.Thumbprint
+                If ($BoundCertificates.Thumbprint -match $CertificateThumbprint) 
+                {
+                    Write-Verbose "Removing Web App Certificate with Thumbprint $CertificateThumbprint"
+                    Remove-AzWebAppCertificate -ResourceGroupName $ResourceGroupName -Thumbprint $CertificateThumbprint
                 }
             }
         }

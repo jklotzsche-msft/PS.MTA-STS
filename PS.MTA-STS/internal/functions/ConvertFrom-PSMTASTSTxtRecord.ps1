@@ -16,6 +16,7 @@
         Returns one logical TXT value without presentation quotes.
     #>
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [AllowNull()]
@@ -29,10 +30,24 @@
                 $InputObject.Strings -join ''
             }
             elseif ($InputObject.Type -eq 16) {
-                $data = [string]$InputObject.Data
+                $dataValue = @($InputObject.Data)
+                if ($dataValue.Count -eq 1 -and $dataValue[0] -is [System.Array]) {
+                    $dataValue = @($dataValue[0])
+                }
+
+                $data = ($dataValue | ForEach-Object { [string]$_ }) -join ''
+                $trimmedData = $data.Trim()
+                if ($trimmedData.Length -eq 0) {
+                    return
+                }
+
+                if ($trimmedData -notmatch '"') {
+                    return $trimmedData
+                }
+
                 $pattern = '"((?:\\.|[^"\\])*)"'
-                $segments = [regex]::Matches($data, $pattern)
-                if ($segments.Count -eq 0 -or [regex]::Replace($data, $pattern, '').Trim().Length -gt 0) {
+                $segments = [regex]::Matches($trimmedData, $pattern)
+                if ($segments.Count -eq 0 -or [regex]::Replace($trimmedData, $pattern, '').Trim().Length -gt 0) {
                     throw 'Malformed DNS TXT presentation data: expected quoted character strings.'
                 }
 
